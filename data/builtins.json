@@ -1,0 +1,2688 @@
+[
+  {
+    "name": "DO",
+    "kind": "Snippet",
+    "detail": "DO !var FROM <start> TO <end> [BY <step>] ... ENDDO",
+    "documentation": "Numeric loop construct. Iterates a counter variable over a range.\n\n**Syntax:**\n```pml\nDO !counter FROM 1 TO 10\n    -- statements\nENDDO\n```\n\n**Optional clauses:**\n- `BY <step>` — increment value (default `1`)\n\n**Variants:**\n- `DO !item VALUES !array` — iterate over array values\n- `DO !i INDICES !array` — iterate over array indices\n\nUse `BREAK` to exit early or `SKIP` to continue to the next iteration.",
+    "insert_text": "DO !${1:counter} FROM ${2:1} TO ${3:10}\n    $0\nENDDO"
+  },
+  {
+    "name": "IF",
+    "kind": "Snippet",
+    "detail": "IF (<condition>) THEN ... [ELSEIF] [ELSE] ENDIF",
+    "documentation": "Conditional execution. The body runs only if the condition evaluates to TRUE.\n\n**Syntax:**\n```pml\nIF (!number LT 0) THEN\n    !negative = TRUE\nELSEIF (!number EQ 0) THEN\n    !zero = TRUE\nELSE\n    !positive = TRUE\nENDIF\n```\n\n**Operators:** `EQ`, `NE`, `LT`, `LE`, `GT`, `GE`, `AND`, `OR`, `NOT`",
+    "insert_text": "IF (${1:condition}) THEN\n    $0\nENDIF"
+  },
+  {
+    "name": "STRING",
+    "kind": "Constructor",
+    "detail": "STRING(<value>) IS STRING — convert value to STRING",
+    "documentation": "Constructs a STRING from another PML value. Supports many input types; the result is the textual representation.\n\n**Overloads:**\n- `STRING(BLOCK)` — from a BLOCK expression\n- `STRING(BOOLEAN)` — `'TRUE'` or `'FALSE'`\n- `STRING(BOOLEAN, FORMAT)` — using a FORMAT object's settings\n- `STRING(BORE)` and `STRING(BORE, FORMAT)`\n- `STRING(DB)` — the database name. The FORMAT overload exists only for consistency with Forms and Menus.\n- `STRING(DIRECTION)` and `STRING(DIRECTION, FORMAT)`\n- `STRING(MDB)` — the MDB name\n- `STRING(ORIENTATION)` and `STRING(ORIENTATION, FORMAT)`\n- `STRING(POSITION)` and `STRING(POSITION, FORMAT)`\n- `STRING(PROJECT)` — the project code\n- `STRING(REAL)` and `STRING(REAL, FORMAT)`\n- `STRING(REAL, STRING)` — the second STRING is a legacy `Dn` decimal-places format\n- `STRING(SESSION)` — the session number\n- `STRING(TEAM)` — the team name\n- `STRING(USER)` — the user name\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "After",
+    "kind": "Method",
+    "detail": "After(STRING two) IS STRING",
+    "documentation": "Returns the sub-string that comes after the leftmost occurrence of `two` in the receiver. If `two` is not found, behaviour matches the empty-result convention of the related `Before` method.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Before",
+    "kind": "Method",
+    "detail": "Before(STRING two) IS STRING",
+    "documentation": "Returns the sub-string that comes before the leftmost occurrence of `two` in the receiver.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Block",
+    "kind": "Method",
+    "detail": "Block([STRING expression]) IS BLOCK",
+    "documentation": "**On a STRING:** wraps the receiver as a BLOCK so it can be evaluated as PML code.\n\n**As constructor:** equivalent to `BLOCK(!str)`.\n\n**Returns:** BLOCK",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Boolean",
+    "kind": "Method",
+    "detail": "Boolean() IS BOOLEAN",
+    "documentation": "Converts the receiver to a BOOLEAN.\n\n**On a STRING:**\n- TRUE for `'TRUE'`, `'T'`, `'YES'`, `'Y'` (case-insensitive)\n- FALSE for `'FALSE'`, `'F'`, `'NO'`, `'N'`\n\n**On a REAL:**\n- FALSE if the value is exactly zero\n- TRUE for any other value\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "STRING",
+      "REAL"
+    ]
+  },
+  {
+    "name": "Bore",
+    "kind": "Method",
+    "detail": "Bore() IS BORE  /  Bore(FORMAT) IS BORE  (STRING only)",
+    "documentation": "Converts the receiver to a BORE object (exact conversion — no rounding).\n\n**On a STRING:**\n- `Bore()` — direct conversion\n- `Bore(!!format)` — using a FORMAT object's settings\n\n**On a REAL:**\n- `Bore()` — interprets the numeric value using the current BORE units setting\n\nFor nearest-match conversion (rather than exact), use `NearestBore()`.\n\n**Returns:** BORE",
+    "receiver_types": [
+      "STRING",
+      "REAL"
+    ]
+  },
+  {
+    "name": "DBRef",
+    "kind": "Method",
+    "detail": "DBRef() IS DBREF  /  DBRef(FORMAT) IS DBREF",
+    "documentation": "Converts the STRING to a DBREF. Pass a FORMAT object to interpret the STRING using the global format settings.\n\n**Returns:** DBREF",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Direction",
+    "kind": "Method",
+    "detail": "Direction(POSITION) IS DIRECTION  /  Direction([FORMAT]) IS DIRECTION",
+    "documentation": "**On a POSITION:** returns the DIRECTION from the receiver to the passed position.\n\n**On a STRING:** parses the STRING as a DIRECTION, optionally using FORMAT settings.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "STRING",
+      "POSITION"
+    ]
+  },
+  {
+    "name": "DLength",
+    "kind": "Method",
+    "detail": "DLength() IS REAL",
+    "documentation": "Returns the number of characters in the STRING, treating multibyte characters as one character each. Use `Length()` for byte-counted length.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "DMatch",
+    "kind": "Method",
+    "detail": "DMatch(STRING) IS REAL",
+    "documentation": "Multibyte-aware version of `Match()` — finds the start position of a sub-string while counting multibyte characters as one.\n\n**Returns:** REAL — the 1-based start index, or 0 if not found.",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "DSubstring",
+    "kind": "Method",
+    "detail": "DSubstring(REAL) IS STRING  /  DSubstring(REAL, REAL) IS STRING",
+    "documentation": "Multibyte-aware version of `Substring()`.\n\n**Overloads:**\n- `DSubstring(!index)` — returns from `!index` to the end\n- `DSubstring(!index, !nchars)` — returns `!nchars` characters starting at `!index`\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Empty",
+    "kind": "Method",
+    "detail": "Empty() IS BOOLEAN",
+    "documentation": "Tests whether the receiver contains no content.\n\n**On a STRING:** TRUE if the STRING has zero length.\n\n**On an ARRAY:** TRUE if the array has no defined elements.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "STRING",
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Length",
+    "kind": "Method",
+    "detail": "Length() IS REAL",
+    "documentation": "Returns the number of characters in the STRING. For multibyte-aware counting, use `DLength()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "LowCase",
+    "kind": "Method",
+    "detail": "LowCase() IS STRING",
+    "documentation": "Returns a copy of the STRING with all letters converted to lower case.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "LT",
+    "kind": "Method",
+    "detail": "LT(value) IS BOOLEAN  /  <expr> LT <expr>",
+    "documentation": "Less-than comparison. Behaviour depends on receiver and argument type.\n\n**On a STRING:**\n- `LT(!other)` — TRUE if receiver sorts before `!other` using ASCII collating order\n\n**On a REAL:**\n- `LT(!other)` where `!other` is REAL — numeric less-than\n- `LT(!bore)` where `!bore` is BORE — comparison using current BORE units\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "STRING",
+      "REAL",
+      "POSITION",
+      "DIRECTION",
+      "ORIENTATION",
+      "BORE",
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "Match",
+    "kind": "Method",
+    "detail": "Match(STRING two) IS REAL",
+    "documentation": "Locates the start of `two` within the receiver. Returns the 1-based index of the first character of the match, or 0 if `two` is not found.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "MatchWild",
+    "kind": "Method",
+    "detail": "MatchWild(STRING two[, STRING multiple[, STRING single]]) IS BOOLEAN",
+    "documentation": "Tests whether the receiver matches a wildcard pattern.\n\n**Default wildcards:**\n- `*` — any number of characters\n- `?` — any single character\n\n**Overloads:**\n- `MatchWild(!pattern)` — uses default `*` and `?`\n- `MatchWild(!pattern, !multiple)` — `!multiple` replaces `*`\n- `MatchWild(!pattern, !multiple, !single)` — also overrides `?`\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Occurs",
+    "kind": "Method",
+    "detail": "Occurs(STRING) IS REAL",
+    "documentation": "Returns the number of times the argument appears in the receiver.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Orientation",
+    "kind": "Method",
+    "detail": "Orientation() IS ORIENTATION  /  Orientation(FORMAT !!format) IS ORIENTATION",
+    "documentation": "Converts the STRING to an ORIENTATION. Pass a FORMAT object to interpret the STRING using its settings — typically `!!format`.\n\n**Returns:** ORIENTATION",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Part",
+    "kind": "Method",
+    "detail": "Part(REAL nth[, STRING delim]) IS STRING",
+    "documentation": "Extracts the `nth` whitespace- or delimiter-separated field from the STRING.\n\n**Overloads:**\n- `Part(!nth)` — fields are delimited by space, tab, or newline\n- `Part(!nth, !delim)` — fields are delimited by `!delim`\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Position",
+    "kind": "Method",
+    "detail": "Position() IS POSITION  /  Position(FORMAT !!format) IS POSITION",
+    "documentation": "Converts the STRING to a POSITION. Pass a FORMAT object — typically the global `!!format` — to control the parsing.\n\n**Returns:** POSITION",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Replace",
+    "kind": "Method",
+    "detail": "Replace(STRING two, STRING three[, REAL nth[, REAL count]]) IS STRING",
+    "documentation": "Returns a copy of the receiver with occurrences of `two` replaced by `three`.\n\n**Overloads:**\n- `Replace(!two, !three)` — replaces all occurrences\n- `Replace(!two, !three, !nth)` — starts from the `!nth` occurrence (negative `!nth` counts from the end)\n- `Replace(!two, !three, !nth, !count)` — replaces only `!count` occurrences starting at `!nth`\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Split",
+    "kind": "Method",
+    "detail": "Split() IS ARRAY  /  Split(STRING delim) IS ARRAY",
+    "documentation": "Splits the STRING into an ARRAY of sub-strings.\n\n**Overloads:**\n- `Split()` — splits on whitespace; multiple consecutive spaces are compressed into a single delimiter\n- `Split(!delim)` — splits on `!delim`; consecutive delimiters are *not* compressed (yields empty elements)\n\n**Returns:** ARRAY of STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "String",
+    "kind": "Method",
+    "detail": "String([FORMAT|precision]) IS STRING",
+    "documentation": "Returns a STRING representation of the receiver, optionally formatted by a FORMAT object.\n\n**Receivers and forms:**\n- STRING: `String(!!format)` reformats using the global FORMAT settings\n- DBREF: `String(!!format)` returns the DB element reference\n- REAL: `String(!!format)` or `String('D2')` (decimal-places shortcut)\n- POSITION / DIRECTION / ORIENTATION / BORE: `String(!!format)` formats using FORMAT settings\n\nFor converting other types *into* a STRING, use the global `STRING(...)` constructor instead.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING",
+      "DBREF",
+      "REAL",
+      "POSITION",
+      "DIRECTION",
+      "ORIENTATION",
+      "BORE"
+    ]
+  },
+  {
+    "name": "Substring",
+    "kind": "Method",
+    "detail": "Substring(REAL index[, REAL nchars]) IS STRING",
+    "documentation": "Extracts a sub-string from the receiver.\n\n**Overloads:**\n- `Substring(!index)` — returns the sub-string from `!index` to the end\n- `Substring(!index, !nchars)` — returns `!nchars` characters starting at `!index`\n\nIndices are 1-based. For multibyte-aware extraction, use `DSubstring()`.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "Trim",
+    "kind": "Method",
+    "detail": "Trim([STRING options[, STRING char]]) IS STRING",
+    "documentation": "Removes leading/trailing whitespace, or compresses repeated characters.\n\n**Overloads:**\n- `Trim()` — removes leading and trailing spaces\n- `Trim('L')` — leading spaces only\n- `Trim('R')` — trailing spaces only\n- `Trim('LR')` — both\n- `Trim('M', !char)` — collapses runs of `!char` into a single occurrence throughout the STRING\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "UpCase",
+    "kind": "Method",
+    "detail": "UpCase() IS STRING",
+    "documentation": "Returns a copy of the STRING with all letters converted to upper case.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "VLogical",
+    "kind": "Method",
+    "detail": "VLogical() IS BOOLEAN",
+    "documentation": "Evaluates the STRING as a PML expression and returns the result as a BOOLEAN. Use this when the STRING contains an expression rather than a plain literal — for plain literals use `Boolean()`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "VText",
+    "kind": "Method",
+    "detail": "VText() IS STRING",
+    "documentation": "Evaluates the STRING as a PML expression and returns the result as a STRING.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "VValue",
+    "kind": "Method",
+    "detail": "VValue() IS REAL",
+    "documentation": "Evaluates the STRING as a PML expression and returns the numeric result. Use this when the STRING contains an expression — for plain numeric literals use `REAL()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING"
+    ]
+  },
+  {
+    "name": "DBREF",
+    "kind": "Constructor",
+    "detail": "DBREF(STRING[, FORMAT]) IS DBREF",
+    "documentation": "Constructs a DBREF object pointing at the database element identified by the STRING argument (typically a name or reference number).\n\n**Overloads:**\n- `DBREF(!name)` — by name or refno\n- `DBREF(!name, !!format)` — using the global FORMAT object's settings; the FORMAT argument is required for consistency with Forms and Menus, not because it changes behaviour materially\n\nIdiomatic alternatives:\n```pml\n!d = OBJECT DBREF(!!CE)\n!d = !!CE.DBREF()\n```\n\n**Returns:** DBREF",
+    "receiver_types": []
+  },
+  {
+    "name": "Attribute",
+    "kind": "Method",
+    "detail": "Attribute(STRING name) IS ANY",
+    "documentation": "Returns the value of the named database attribute on the element this DBREF points to. The result type depends on the attribute — could be STRING, REAL, POSITION, DIRECTION, etc.\n\nNote: For statically-known attributes you can also use direct attribute syntax (`!!CE.Description`, `!!CE.Owner`). `Attribute()` is useful when the attribute name is itself dynamic.\n\n**Returns:** ANY",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "Attributes",
+    "kind": "Method",
+    "detail": "Attributes() IS ARRAY OF STRING",
+    "documentation": "Returns the names of all attributes available on the database element this DBREF points to. The set of attributes depends on the element type the DBREF is currently pointing at.\n\n**Returns:** ARRAY OF STRING",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "BadRef",
+    "kind": "Method",
+    "detail": "BadRef() IS BOOLEAN",
+    "documentation": "Returns TRUE if the DBREF is not valid — that is, if it cannot be navigated to (the element doesn't exist, isn't accessible in the current MDB, etc.).\n\nUseful for guarding navigation:\n```pml\nIF (NOT !ref.BadRef()) THEN\n    -- safe to use !ref\nENDIF\n```\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "Delete",
+    "kind": "Method",
+    "detail": "Delete() — no result",
+    "documentation": "Deletes the **PML DBREF object** — *not* the database element it points to. Use this to release a PML reference variable; it does not modify the database.\n\n**Returns:** No result",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "MCount",
+    "kind": "Method",
+    "detail": "MCount([STRING type]) IS REAL",
+    "documentation": "Returns the number of members owned by the element this DBREF references.\n\n**Overloads:**\n- `MCount()` — count of all members\n- `MCount(!type)` — count of members whose element type matches `!type` (e.g. `'PIPE'`, `'EQUI'`)\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "Line",
+    "kind": "Method",
+    "detail": "Line(POSITION) IS LINE  /  Line(['CUT'|'UNCUT']) IS LINE",
+    "documentation": "Returns the cut or uncut pline of a SCTN (section) or GENSEC (general section) element as a bounded LINE object.\n\n**Overloads:**\n- `Line()` — uncut by default\n- `Line('CUT')` — explicit cut form\n- `Line('UNCUT')` — explicit uncut form\n\nOnly meaningful when the DBREF points at a section element. Calling on other element types raises an error.\n\n**Returns:** LINE",
+    "receiver_types": [
+      "DBREF",
+      "POSITION"
+    ]
+  },
+  {
+    "name": "PPosition",
+    "kind": "Method",
+    "detail": "PPosition(REAL n) IS POSITION",
+    "documentation": "Returns the position (P-point coordinates) of the *n*th P-point of the database element this DBREF references.\n\n**Returns:** POSITION",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "PDirection",
+    "kind": "Method",
+    "detail": "PDirection(REAL n) IS DIRECTION",
+    "documentation": "Returns the direction vector of the *n*th P-point of the database element this DBREF references.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DBREF"
+    ]
+  },
+  {
+    "name": "REAL",
+    "kind": "Constructor",
+    "detail": "REAL(BOOLEAN|BORE|STRING[, FORMAT]) IS REAL",
+    "documentation": "Constructs a REAL or converts the receiver to a numeric value.\n\n**Constructor form:**\n- `REAL(!bool)` — `TRUE` becomes `1`, `FALSE` becomes `0`\n- `REAL(!bore)` — converts a BORE to its numeric value\n- `REAL(!str)` — parses the STRING as a number\n- `REAL(!str, !!format)` — parses using FORMAT settings\n\n**Instance method form (note: spelled `Real()` on most receivers):**\n- `!str.REAL()` — parse STRING as number\n- `!bool.Real()` — `TRUE` → 1, `FALSE` → 0\n- `!bore.Real()` — BORE numeric value\n\nNote: For evaluating a STRING containing a PML *expression* rather than a literal number, use `VValue()` instead.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "STRING",
+      "BOOLEAN",
+      "BORE"
+    ]
+  },
+  {
+    "name": "ABS",
+    "kind": "Method",
+    "detail": "ABS(number) IS REAL  /  ABS() IS REAL  (REAL receiver)",
+    "documentation": "Absolute value of a number.\n\n**As global function (PML 1):** `ABS(!num)`\n**As method (PML 2):** `!num.ABS()`\n\nBoth forms always return a non-negative result.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "ACos",
+    "kind": "Method",
+    "detail": "ACos() IS REAL",
+    "documentation": "Arc cosine. Returns the angle whose cosine is the receiver.\n\n**Returns:** REAL (angle)",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "ALog",
+    "kind": "Method",
+    "detail": "ALog() IS REAL",
+    "documentation": "Antilogarithm — base-10 power: returns `10 ^ receiver`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "ASin",
+    "kind": "Method",
+    "detail": "ASin() IS REAL",
+    "documentation": "Arc sine. Returns the angle whose sine is the receiver.\n\n**Returns:** REAL (angle)",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "ATan",
+    "kind": "Method",
+    "detail": "ATan() IS REAL",
+    "documentation": "Arc tangent. Returns the angle whose tangent is the receiver.\n\n**Returns:** REAL (angle)",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "ATanT",
+    "kind": "Method",
+    "detail": "ATanT(REAL x) IS REAL",
+    "documentation": "Two-argument arc tangent — equivalent to `atan2`. Returns the angle of the vector from the origin to point `(x, receiver)`, with quadrant disambiguation.\n\n**Returns:** REAL (angle)",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Between",
+    "kind": "Method",
+    "detail": "Between(REAL low, REAL high) IS BOOLEAN",
+    "documentation": "Returns TRUE if the receiver is in the closed interval `[low, high]` — *inclusive* of the endpoints. For exclusive comparison, use `SBetween()`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Cosine",
+    "kind": "Method",
+    "detail": "Cosine() IS REAL",
+    "documentation": "Cosine of the receiver (angle).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Dimension",
+    "kind": "Method",
+    "detail": "Dimension() IS STRING",
+    "documentation": "Returns a STRING describing the dimensional units of the value (e.g., distance, angle, dimensionless).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Distance",
+    "kind": "Method",
+    "detail": "Distance(POSITION|LINE|PLANE|ARC) IS REAL  (POSITION receiver)\\n  Distance([BOOLEAN, BOOLEAN, BOOLEAN, REAL, BOOLEAN]) IS STRING  (REAL receiver)",
+    "documentation": "Formats the receiver as a distance string.\n\n**Overloads:**\n- `Distance()` — uses the current default settings\n- `Distance(!feet, !us, !fraction, !precision, !zeroes)` — explicit formatting:\n  - `!feet` — TRUE: feet & inches; FALSE: inches only\n  - `!us` — TRUE: US format; FALSE: PDMS format\n  - `!fraction` — TRUE: fractional output; FALSE: decimal\n  - `!precision` — denominator (for fractions) or decimal places\n  - `!zeroes` — TRUE: emit trailing zeroes; FALSE: trim them\n\n**Returns:** STRING",
+    "receiver_types": [
+      "REAL",
+      "POSITION"
+    ]
+  },
+  {
+    "name": "EQ",
+    "kind": "Method",
+    "detail": "EQ(value) IS BOOLEAN  /  <expr> EQ <expr>",
+    "documentation": "Equality comparison.\n\n**On a REAL:**\n- `EQ(!other)` where `!other` is REAL — numeric equality\n- `EQ(!bore)` where `!bore` is BORE — comparison using current BORE units\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL",
+      "POSITION",
+      "DIRECTION",
+      "ORIENTATION",
+      "BORE",
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "GEQ",
+    "kind": "Method",
+    "detail": "GEQ(REAL|BORE) IS BOOLEAN",
+    "documentation": "Greater-than-or-equal comparison.\n\n**On a REAL:**\n- `GEQ(!other)` where `!other` is REAL — numeric `>=`\n- `GEQ(!bore)` where `!bore` is BORE — comparison using current BORE units\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL",
+      "BORE",
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "GT",
+    "kind": "Method",
+    "detail": "GT(value) IS BOOLEAN  /  <expr> GT <expr>",
+    "documentation": "Greater-than comparison.\n\n**On a REAL:**\n- `GT(!other)` where `!other` is REAL — numeric `>`\n- `GT(!bore)` where `!bore` is BORE — comparison using current BORE units\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL",
+      "BORE",
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "INT",
+    "kind": "Method",
+    "detail": "INT(number) IS REAL  /  INT() IS REAL  (REAL receiver)",
+    "documentation": "Truncates a number toward zero.\n\n**Forms:**\n- Global function (PML 1): `INT(!num)`\n- Method (PML 2): `!num.INT()`\n\nFor nearest-integer rounding, use `Nint()` / `NINT(...)`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "LEQ",
+    "kind": "Method",
+    "detail": "LEQ(REAL|BORE) IS BOOLEAN",
+    "documentation": "Less-than-or-equal comparison.\n\n**On a REAL:**\n- `LEQ(!other)` where `!other` is REAL — numeric `<=`\n- `LEQ(!bore)` where `!bore` is BORE — comparison using current BORE units\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL",
+      "BORE",
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "LOG",
+    "kind": "Method",
+    "detail": "LOG(number) IS REAL  /  LOG() IS REAL  (REAL receiver)",
+    "documentation": "Natural logarithm of a number. Argument must be positive.\n\n**Forms:**\n- Global function (PML 1): `LOG(!num)`\n- Method (PML 2): `!num.LOG()`\n\n(Note: AVEVA's manual is inconsistent — some sections describe LOG as base-10. In modern PML it returns the natural log.)\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "NearestBore",
+    "kind": "Method",
+    "detail": "NearestBore() IS BORE",
+    "documentation": "Converts the numeric value to the *nearest* standard BORE size, using the current BORE units setting. Unlike `Bore()` which requires an exact match, this rounds to the closest available standard bore.\n\n**Returns:** BORE",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Nint",
+    "kind": "Method",
+    "detail": "Nint() IS REAL",
+    "documentation": "Rounds the receiver to the nearest whole number (rounds half away from zero). For truncation toward zero, use `INT()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Power",
+    "kind": "Method",
+    "detail": "Power(REAL exponent) IS REAL",
+    "documentation": "Raises the receiver to the given exponent: `receiver ^ exponent`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "SBetween",
+    "kind": "Method",
+    "detail": "SBetween(REAL low, REAL high) IS BOOLEAN",
+    "documentation": "Returns TRUE if the receiver is in the open interval `(low, high)` — *exclusive* of the endpoints. For inclusive comparison, use `Between()`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Sine",
+    "kind": "Method",
+    "detail": "Sine() IS REAL",
+    "documentation": "Sine of the receiver (angle).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Sqrt",
+    "kind": "Method",
+    "detail": "Sqrt() IS REAL",
+    "documentation": "Square root of the receiver. The receiver must be non-negative.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "Tangent",
+    "kind": "Method",
+    "detail": "Tangent() IS REAL",
+    "documentation": "Tangent of the receiver (angle).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "REAL"
+    ]
+  },
+  {
+    "name": "define function",
+    "kind": "Snippet",
+    "detail": "define function !!Name(!param IS TYPE) IS RETURNTYPE ... endfunction",
+    "documentation": "PML2 function definition. Function names are global (`!!` prefix) and the file name conventionally matches the function name in lowercase, with extension `.pmlfnc`.\n\n**Syntax:**\n```pml\ndefine function !!Area(!Length is REAL, !Width is REAL) is REAL\n    !Area = !Length * !Width\n    return !Area\nendfunction\n```\n\n**Notes:**\n- Omit the trailing `is RETURNTYPE` to define a **procedure** (no return value)\n- Use `ANY` as the parameter type to accept any type\n- Output arguments must already exist before the call\n- The `define function` line must be the first non-comment line in the file",
+    "insert_text": "define function !!${1:Name}(!${2:param} is ${3:REAL}) is ${4:REAL}\n    $0\n    return !${1}\nendfunction"
+  },
+  {
+    "name": "define method",
+    "kind": "Snippet",
+    "detail": "define method .Name() IS RETURNTYPE ... endmethod",
+    "documentation": "PML2 method definition for a user-defined object type. Method definitions live in the same file as the corresponding `define object`, after `endobject`.\n\n**Syntax:**\n```pml\ndefine method .FullDesc() is STRING\n    return !this.Type & ' ' & !this.Material\nendmethod\n```\n\n**Notes:**\n- `!this` is the implicit receiver (the object the method was called on)\n- A method with no arguments and the same name as the object type is the **default constructor**\n- Methods can be overloaded by argument types; only one no-argument overload is allowed per name",
+    "insert_text": "define method .${1:Name}(${2}) is ${3:STRING}\n    $0\nendmethod"
+  },
+  {
+    "name": "define object",
+    "kind": "Snippet",
+    "detail": "define object NAME ... endobject",
+    "documentation": "PML2 user-defined object type. Members declare the object's data; methods are defined separately after `endobject` using `define method`.\n\n**Syntax:**\n```pml\ndefine object ELEMENT\n    member .Type is STRING\n    member .Material is STRING\nendobject\n\ndefine method .FullDesc() is STRING\n    return !this.Type & ' ' & !this.Material\nendmethod\n```\n\nUse `OBJECT NAME()` to instantiate: `!item = object ELEMENT()`.",
+    "insert_text": "define object ${1:NAME}\n    member .${2:field} is ${3:STRING}\n    $0\nendobject"
+  },
+  {
+    "name": "member",
+    "kind": "Keyword",
+    "detail": "member .name IS TYPE",
+    "documentation": "Declares a member (field) of a user-defined object type. Used inside a `define object` block.\n\n**Syntax:**\n```pml\nmember .Type is STRING\nmember .Count is REAL\nmember .Items is ARRAY\n```\n\nMembers can be any built-in type (STRING, REAL, BOOLEAN, ARRAY) or another user-defined object type.",
+    "insert_text": "member .${1:name} is ${2:STRING}"
+  },
+  {
+    "name": "handle",
+    "kind": "Snippet",
+    "detail": "handle ANY ... endhandle",
+    "documentation": "PML2 error-handling block. Catches errors raised in the preceding code and lets you respond to them.\n\n**Syntax:**\n```pml\n!result = !something.RiskyCall()\nhandle ANY\n    $p Error: $!!Error.text\nendhandle\n```\n\n**Notes:**\n- `ANY` catches all errors\n- Inside the handler, `!!Error.text`, `!!Error.code`, etc. give error details\n- Without a handler, errors abandon the current PML function/macro and show an alert",
+    "insert_text": "handle ANY\n    $0\nendhandle"
+  },
+  {
+    "name": "break",
+    "kind": "Keyword",
+    "detail": "break — exit the innermost DO loop",
+    "documentation": "Exits the innermost enclosing `DO` loop immediately. The loop counter retains the value it had when `break` was hit.\n\n**Example:**\n```pml\nDO !Number\n    IF (!Number GT 100) THEN\n        break\n    ENDIF\n    !Result = !Result + !Number\nENDDO\n```\n\nFor a one-line conditional break, use `break if (...)`. `break` only exits the innermost loop in nested loops.",
+    "receiver_types": []
+  },
+  {
+    "name": "break if",
+    "kind": "Snippet",
+    "detail": "break if (<condition>)",
+    "documentation": "Conditionally exits the innermost enclosing `DO` loop. The parentheses around the expression are optional but recommended.\n\n**Example:**\n```pml\nDO !Number\n    break if (!Number GT 100)\n    !Result = !Result + !Number\nENDDO\n```\n\nAny expression that evaluates to a BOOLEAN is allowed, including PML function calls.",
+    "insert_text": "break if (${1:condition})"
+  },
+  {
+    "name": "skip",
+    "kind": "Keyword",
+    "detail": "skip — continue to next DO iteration",
+    "documentation": "Returns to the top of the innermost enclosing `DO` loop, skipping any commands after `skip` and continuing with the next value of the loop counter.\n\n**Example — skip odd numbers:**\n```pml\nDO !X\n    !Number = !Sample[!X]\n    IF ((INT(!Number/2)) NE (!Number/2)) THEN\n        skip\n    ENDIF\n    !Result = !Result + !Number\nENDDO\n```\n\nFor a one-line conditional skip, use `skip if (...)`. `skip` only affects the innermost loop in nested loops.",
+    "receiver_types": []
+  },
+  {
+    "name": "skip if",
+    "kind": "Snippet",
+    "detail": "skip if (<condition>)",
+    "documentation": "Conditionally returns to the top of the innermost enclosing `DO` loop.\n\n**Example:**\n```pml\nDO !X\n    !Number = !Sample[!X]\n    skip if (INT(!Number/2) NE (!Number/2))\n    !Result = !Result + !Number\nENDDO\n```",
+    "insert_text": "skip if (${1:condition})"
+  },
+  {
+    "name": "DO INDEX",
+    "kind": "Snippet",
+    "detail": "DO !i INDEX !array ... ENDDO",
+    "documentation": "Loops the counter over the **indices** of an ARRAY. The loop variable takes successive integer index values present in `!array`.\n\n**Syntax:**\n```pml\nDO !i INDEX !MyArray\n    $p Index $!i contains $!MyArray[!i]\nENDDO\n```\n\nFor looping over the **values** themselves, use `DO !item VALUES !array`.",
+    "insert_text": "DO !${1:i} INDEX !${2:array}\n    $0\nENDDO"
+  },
+  {
+    "name": "DO VALUES",
+    "kind": "Snippet",
+    "detail": "DO !item VALUES !array ... ENDDO",
+    "documentation": "Loops over the **values** in an ARRAY. The loop variable becomes each successive element. Works with arrays of any type, including heterogeneous arrays of objects.\n\n**Syntax:**\n```pml\nDO !Person VALUES !MyEmployees\n    !Names.Append(!Person.Name)\nENDDO\n```\n\nFor looping over the **indices**, use `DO !i INDEX !array`.",
+    "insert_text": "DO !${1:item} VALUES !${2:array}\n    $0\nENDDO"
+  },
+  {
+    "name": "label",
+    "kind": "Snippet",
+    "detail": "LABEL /name",
+    "documentation": "Declares a named label that can be jumped to with `GOLABEL`. Label names are prefixed with `/` and may be up to 16 characters (excluding the slash).\n\n**Syntax:**\n```pml\nLABEL /finished\n```\n\n**Note:** GOTO-style control flow is generally discouraged in modern PML2 — prefer structured constructs (`IF`, `DO`, functions) where possible. Labels remain useful for breaking out of deeply nested loops.",
+    "insert_text": "LABEL /${1:name}"
+  },
+  {
+    "name": "golabel",
+    "kind": "Snippet",
+    "detail": "GOLABEL /name [if (<condition>)]",
+    "documentation": "Jumps execution to the line following a matching `LABEL /name`. Can jump forward or backward.\n\n**Syntax:**\n```pml\nGOLABEL /finished\nGOLABEL /finished if (!count GT 100)\n```\n\n**Restrictions:**\n- Cannot jump *into* a `DO` block from outside\n- *Can* jump out of a nested block to a label in an enclosing block\n\nLabels named in `GOLABEL` must exist somewhere in the same PML file.",
+    "insert_text": "GOLABEL /${1:name}"
+  },
+  {
+    "name": "return",
+    "kind": "Keyword",
+    "detail": "return [<value>]",
+    "documentation": "Returns from the current function, method, or PML file.\n\n**Inside a function or method:**\n```pml\nreturn !Area     -- return a value\nreturn           -- early exit (procedure)\n```\n\n**Inside a PML macro file:** stops further execution of the file and returns to the calling file.\n\nNote: this is distinct from the `RETURN` command historically used to set return values in old-style PML1 code.",
+    "receiver_types": []
+  },
+  {
+    "name": "ELSE",
+    "kind": "Keyword",
+    "detail": "ELSE — alternative branch in IF",
+    "documentation": "Introduces the alternative branch of an `IF ... THEN ... ENDIF` block. Runs when none of the preceding `IF` / `ELSEIF` conditions evaluated TRUE.\n\n**Syntax:**\n```pml\nIF (!number GT 0) THEN\n    !sign = 'positive'\nELSE\n    !sign = 'non-positive'\nENDIF\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ELSEIF",
+    "kind": "Keyword",
+    "detail": "ELSEIF (<condition>) THEN",
+    "documentation": "Introduces an additional condition branch in an `IF ... ENDIF` block. Evaluated only if the preceding `IF` / `ELSEIF` conditions were FALSE.\n\n**Syntax:**\n```pml\nIF (!number GT 0) THEN\n    !sign = 'positive'\nELSEIF (!number EQ 0) THEN\n    !sign = 'zero'\nELSE\n    !sign = 'negative'\nENDIF\n```",
+    "insert_text": "ELSEIF (${1:condition}) THEN\n    $0"
+  },
+  {
+    "name": "ENDIF",
+    "kind": "Keyword",
+    "detail": "ENDIF — closes an IF block",
+    "documentation": "Closes an `IF ... THEN ... ENDIF` block.\n\n**Example:**\n```pml\nIF (!x GT 0) THEN\n    !sign = 'positive'\nENDIF\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ENDDO",
+    "kind": "Keyword",
+    "detail": "ENDDO — closes a DO loop",
+    "documentation": "Closes a `DO ... ENDDO` loop block. Pairs with all DO loop variants: `DO !i FROM ... TO ...`, `DO !i INDEX !arr`, `DO !item VALUES !arr`.\n\n**Example:**\n```pml\nDO !i FROM 1 TO 10\n    $p $!i\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ENDFUNCTION",
+    "kind": "Keyword",
+    "detail": "ENDFUNCTION — closes a function definition",
+    "documentation": "Closes a `define function ... endfunction` block.\n\n**Example:**\n```pml\ndefine function !!Area(!Length is REAL, !Width is REAL) is REAL\n    return !Length * !Width\nendfunction\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ENDMETHOD",
+    "kind": "Keyword",
+    "detail": "ENDMETHOD — closes a method definition",
+    "documentation": "Closes a `define method ... endmethod` block.\n\n**Example:**\n```pml\ndefine method .FullDesc() is STRING\n    return !this.Type & ' ' & !this.Material\nendmethod\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ENDOBJECT",
+    "kind": "Keyword",
+    "detail": "ENDOBJECT — closes an object type definition",
+    "documentation": "Closes a `define object ... endobject` block. Method definitions for the object follow this line, each with their own `define method ... endmethod`.\n\n**Example:**\n```pml\ndefine object ELEMENT\n    member .Type is STRING\n    member .Material is STRING\nendobject\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ENDHANDLE",
+    "kind": "Keyword",
+    "detail": "ENDHANDLE — closes an error handler block",
+    "documentation": "Closes a `handle ANY ... endhandle` error-handling block.\n\n**Example:**\n```pml\n!result = !something.RiskyCall()\nhandle ANY\n    $p Error: $!!Error.text\nendhandle\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "THEN",
+    "kind": "Keyword",
+    "detail": "THEN — introduces the body of an IF/ELSEIF",
+    "documentation": "Introduces the body of an `IF` or `ELSEIF` clause. Required after the condition expression.\n\n**Example:**\n```pml\nIF (!x GT 0) THEN\n    !sign = 'positive'\nENDIF\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "FROM",
+    "kind": "Keyword",
+    "detail": "FROM — start value in a numeric DO loop",
+    "documentation": "Specifies the starting value of the counter in a numeric `DO` loop. Defaults to `1` if omitted.\n\n**Example:**\n```pml\nDO !i FROM 1 TO 10\n    $p $!i\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "TO",
+    "kind": "Keyword",
+    "detail": "TO — end value in a numeric DO loop",
+    "documentation": "Specifies the ending value of the counter in a numeric `DO` loop. If omitted, the loop runs indefinitely (use `BREAK` or `BREAK IF` to exit).\n\n**Example:**\n```pml\nDO !i FROM 1 TO 10\n    $p $!i\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "BY",
+    "kind": "Keyword",
+    "detail": "BY — step value in a numeric DO loop",
+    "documentation": "Specifies the step (increment or decrement) in a numeric `DO` loop. Default is `+1`. Use a negative value to count down.\n\n**Example:**\n```pml\nDO !i FROM 10 TO 1 BY -1\n    $p $!i\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "INDEX",
+    "kind": "Keyword",
+    "detail": "INDEX — iterate over array indices in a DO loop",
+    "documentation": "Used in a `DO !i INDEX !array` loop to iterate the counter over the *indices* of the array. Compare with `VALUES` which iterates over the elements themselves.\n\n**Example:**\n```pml\nDO !i INDEX !MyArray\n    $p Index $!i contains $!MyArray[!i]\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "VALUES",
+    "kind": "Keyword",
+    "detail": "VALUES — iterate over array values in a DO loop",
+    "documentation": "Used in a `DO !item VALUES !array` loop to iterate over the *values* in an array. Each iteration assigns the next array element to the loop variable.\n\nWorks with arrays of any type, including heterogeneous arrays of objects.\n\n**Example:**\n```pml\nDO !Person VALUES !MyEmployees\n    !Names.Append(!Person.Name)\nENDDO\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ANY",
+    "kind": "Keyword",
+    "detail": "ANY — wildcard type / catch-all error tag",
+    "documentation": "**Two distinct uses:**\n\n**1. As a parameter type** — accepts any PML type:\n```pml\ndefine function !!Print(!Argument is ANY)\n    $p $!Argument\nendfunction\n```\n\n**2. In error handling** — catches all errors:\n```pml\nhandle ANY\n    $p Error: $!!Error.text\nendhandle\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "IS",
+    "kind": "Keyword",
+    "detail": "IS — type declarator",
+    "documentation": "Declares a type. Used in:\n\n- **Parameter declarations:** `!param is TYPE`\n- **Function/method return types:** `define function !!name() is TYPE`\n- **Object members:** `member .field is TYPE`\n\n**Examples:**\n```pml\ndefine function !!Area(!Length is REAL, !Width is REAL) is REAL\n    return !Length * !Width\nendfunction\n\nmember .Type is STRING\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ARRAY",
+    "kind": "Constructor",
+    "detail": "ARRAY() IS ARRAY  (constructor)  /  ARRAY(POSITION|DIRECTION|ORIENTATION) IS ARRAY  (PML 1 function)",
+    "documentation": "**Two distinct uses:**\n\n**1. Constructor (PML 2):** Creates an empty ARRAY.\n```pml\n!arr = OBJECT ARRAY()\n```\n\n**2. PML 1 conversion function:** Converts a POSITION/DIRECTION/ORIENTATION into a 3-element ARRAY of REALs.\n```pml\n!components = ARRAY(!myPosition)\n```\n\nARRAYs are dynamic, sparse, 1-indexed, and may hold values of any PML type.",
+    "receiver_types": []
+  },
+  {
+    "name": "Append",
+    "kind": "Method",
+    "detail": "Append(ANY value) — no result",
+    "documentation": "Appends `value` as a new element at the end of the array. The new element's index is `MaxIndex() + 1`.\n\n**Example:**\n```pml\n!names = ARRAY()\n!names.Append('Alice')\n!names.Append('Bob')\n```\n\nTo append all elements of another array, use `AppendArray()`.\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "AppendArray",
+    "kind": "Method",
+    "detail": "AppendArray(ARRAY values) — no result",
+    "documentation": "Appends every element of `values` as new elements at the end of the receiver array, preserving order.\n\n**Example:**\n```pml\n!combined = !arr1\n!combined.AppendArray(!arr2)\n```\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Clear",
+    "kind": "Method",
+    "detail": "Clear() — no result",
+    "documentation": "Removes all elements from the array, leaving it empty.\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Compress",
+    "kind": "Method",
+    "detail": "Compress() — no result",
+    "documentation": "Removes all undefined (gap) elements and re-indexes the remaining elements consecutively starting from 1.\n\nUseful after operations like `DeleteFrom()` that leave undefined gaps without re-indexing.\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "DeleteFrom",
+    "kind": "Method",
+    "detail": "DeleteFrom(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Marks elements as undefined starting at `index`, leaving gaps. Remaining elements are *not* re-indexed.\n\n**Overloads:**\n- `DeleteFrom(!index)` — undefines from `!index` to the end of the array\n- `DeleteFrom(!index, !n)` — undefines `!n` elements starting at `!index`\n\nReturns an array of the deleted elements (the return value can be ignored if not needed).\n\nTo remove the gaps after, call `Compress()`. For a destructive remove that re-indexes, use `RemoveFrom()`.\n\n**Returns:** ARRAY (deleted elements)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "DeleteTo",
+    "kind": "Method",
+    "detail": "DeleteTo(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Marks elements as undefined up to `index`. Remaining elements are *not* re-indexed.\n\n**Overloads:**\n- `DeleteTo(!index)` — undefines from start of array up to `!index`\n- `DeleteTo(!index, !n)` — undefines `!n` elements ending at `!index`\n\nReturns an array of the deleted elements.\n\n**Returns:** ARRAY (deleted elements)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Difference",
+    "kind": "Method",
+    "detail": "Difference(ARRAY two) IS ARRAY",
+    "documentation": "Returns a new array containing those elements of the receiver that are *not* present in `two`. Duplicates appear only once in the result.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Evaluate",
+    "kind": "Method",
+    "detail": "Evaluate([STRING type]) IS ANY  (BLOCK)\\n  Evaluate(BLOCK) IS ARRAY  (ARRAY)",
+    "documentation": "Evaluates a BLOCK of code at each element of the array, returning a new ARRAY of the results.\n\nInside the BLOCK, refer to the current element using `!!CE` or the implicit element variable, depending on the BLOCK's authoring convention.\n\n**Returns:** ARRAY (new — the original is not modified)",
+    "receiver_types": [
+      "ARRAY",
+      "BLOCK"
+    ]
+  },
+  {
+    "name": "Find",
+    "kind": "Method",
+    "detail": "Find(ANY value) IS ARRAY",
+    "documentation": "Searches the receiver for `value` and returns a new array of the index positions where it was found. Empty if `value` is not found.\n\n**Example:**\n```pml\n!hits = !arr.Find('Bob')\nDO !i VALUES !hits\n    $p Found at index $!i\nENDDO\n```\n\nFor just the first match, use `FindFirst()`.\n\n**Returns:** ARRAY (new — array of REAL indices)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "FindFirst",
+    "kind": "Method",
+    "detail": "FindFirst(ANY value) IS REAL",
+    "documentation": "Returns the index of the first occurrence of `value` in the array, or `UNSET` if `value` is not present.\n\nFaster than `Find()` when you only care about the first match.\n\n**Returns:** REAL (or UNSET if not found)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "First",
+    "kind": "Method",
+    "detail": "First() IS ANY",
+    "documentation": "Returns the value of the first defined element in the array. The element type depends on what you've stored — STRING, REAL, DBREF, etc.\n\n**Returns:** ANY (the type of the first element)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "From",
+    "kind": "Method",
+    "detail": "From(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Returns a copy of a sub-array.\n\n**Overloads:**\n- `From(!index)` — copies from `!index` to the end\n- `From(!index, !n)` — copies `!n` elements starting at `!index`\n\nNon-destructive — the original array is unchanged.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "GetIndexed",
+    "kind": "Method",
+    "detail": "GetIndexed(REAL index) IS ANY  (internal)",
+    "documentation": "Internal method that implements the `ARRAY[index]` accessor syntax. You should normally use the `[!index]` form rather than calling this directly.\n\n```pml\n!val = !arr[3]              -- preferred\n!val = !arr.GetIndexed(3)   -- equivalent\n```\n\n**Returns:** ANY (the element at `!index`)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Indices",
+    "kind": "Method",
+    "detail": "Indices() IS ARRAY",
+    "documentation": "Returns a new array containing the indices of every defined element in the receiver. Useful when iterating over a sparse array.\n\n**Example:**\n```pml\nDO !i VALUES !sparse.Indices()\n    $p !sparse[!i] = $!sparse[!i]\nENDDO\n```\n\nEquivalent to using `DO !i INDEX !sparse` directly.\n\n**Returns:** ARRAY (new — array of REAL indices)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Insert",
+    "kind": "Method",
+    "detail": "Insert(REAL index, ANY value) — no result",
+    "documentation": "Inserts `value` as a new element at `index`. Existing elements at `index` and later are shifted up (re-indexed).\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "InsertArray",
+    "kind": "Method",
+    "detail": "InsertArray(REAL index, ARRAY values) — no result",
+    "documentation": "Inserts every element of `values` starting at `index`. Existing elements at `index` and later are shifted up.\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Intersect",
+    "kind": "Method",
+    "detail": "Intersect(ARRAY two) IS ARRAY",
+    "documentation": "Returns a new array containing those elements present in *both* the receiver and `two`. Duplicates appear only once in the result.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Invert",
+    "kind": "Method",
+    "detail": "Invert() IS ARRAY",
+    "documentation": "Returns a new array with the elements in reverse order. Non-destructive — the original is unchanged.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Last",
+    "kind": "Method",
+    "detail": "Last() IS ANY",
+    "documentation": "Returns the value of the last defined element in the array.\n\n**Returns:** ANY (the type of the last element)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "MaxIndex",
+    "kind": "Method",
+    "detail": "MaxIndex() IS REAL",
+    "documentation": "Returns the subscript (index) of the *last* defined (non-empty) element in the array. For sparse arrays, this may be larger than `Size()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "MinIndex",
+    "kind": "Method",
+    "detail": "MinIndex() IS REAL",
+    "documentation": "Returns the subscript (index) of the *first* defined (non-empty) element. Usually 1, but may be higher for sparse arrays where leading positions are undefined.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Overlay",
+    "kind": "Method",
+    "detail": "Overlay(REAL index, ARRAY two) IS ARRAY",
+    "documentation": "Replaces the receiver's elements at `index` (and subsequent positions) with elements from `two`. Returns an array of the elements that were overwritten (the return value can be ignored if not needed).\n\n**Returns:** ARRAY (overwritten elements)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "ReIndex",
+    "kind": "Method",
+    "detail": "ReIndex(REAL ARRAY indices) — no result",
+    "documentation": "Re-orders the receiver array's elements according to the supplied `indices` array. Typically used with the result of `SortedIndices()`:\n\n```pml\n!order = !arr.SortedIndices()\n!arr.ReIndex(!order)\n```\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Remove",
+    "kind": "Method",
+    "detail": "Remove(REAL nth) IS ANY",
+    "documentation": "Removes and returns the `nth` element. Remaining elements are re-indexed (shifted down to fill the gap).\n\nCompare with `DeleteFrom()` which leaves gaps without re-indexing.\n\n**Returns:** ANY (the removed element)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "RemoveFirst",
+    "kind": "Method",
+    "detail": "RemoveFirst() IS ANY",
+    "documentation": "Removes and returns the first element. Remaining elements are re-indexed.\n\nEquivalent to a queue-style 'pop front' / 'shift'.\n\n**Returns:** ANY (the removed element)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "RemoveFrom",
+    "kind": "Method",
+    "detail": "RemoveFrom(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Removes a sub-range and returns it. Remaining elements are re-indexed.\n\n**Overloads:**\n- `RemoveFrom(!index)` — removes from `!index` to the end\n- `RemoveFrom(!index, !n)` — removes `!n` elements starting at `!index`\n\n**Returns:** ARRAY (the removed elements)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "RemoveLast",
+    "kind": "Method",
+    "detail": "RemoveLast() IS ANY",
+    "documentation": "Removes and returns the last element. Equivalent to a stack-style 'pop'.\n\n**Returns:** ANY (the removed element)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "RemoveTo",
+    "kind": "Method",
+    "detail": "RemoveTo(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Removes elements up to `index` and returns them. Remaining elements are re-indexed.\n\n**Overloads:**\n- `RemoveTo(!index)` — removes from start to `!index`\n- `RemoveTo(!index, !n)` — removes `!n` elements ending at `!index`\n\n**Returns:** ARRAY (the removed elements)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Size",
+    "kind": "Method",
+    "detail": "Size() IS REAL",
+    "documentation": "Returns the number of *defined* elements in the array. For sparse arrays, this may be less than `MaxIndex()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Sort",
+    "kind": "Method",
+    "detail": "Sort() — no result",
+    "documentation": "Sorts the array in place into ascending order. Modifies the receiver.\n\nFor a non-destructive sort, use `SortUnique()` (which also de-duplicates) or `SortedIndices()` paired with a fresh array.\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "SortUnique",
+    "kind": "Method",
+    "detail": "SortUnique() IS ARRAY",
+    "documentation": "Returns a new array containing the receiver's elements in ascending order with duplicates removed. Non-destructive — the original is unchanged.\n\nFor a destructive sort that keeps duplicates, use `Sort()`.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "SortedIndices",
+    "kind": "Method",
+    "detail": "SortedIndices() IS ARRAY",
+    "documentation": "Returns a new ARRAY of REAL indices representing the sorted order of the receiver's elements. The receiver itself is *not* sorted.\n\nTypically paired with `ReIndex()` to apply the sort:\n```pml\n!order = !arr.SortedIndices()\n!arr.ReIndex(!order)\n```\n\n**Returns:** ARRAY (of REAL indices)",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "To",
+    "kind": "Method",
+    "detail": "To(REAL index[, REAL n]) IS ARRAY",
+    "documentation": "Returns a copy of a sub-array taken from the start.\n\n**Overloads:**\n- `To(!index)` — copies from start to `!index`\n- `To(!index, !n)` — copies `!n` elements ending at `!index`\n\nNon-destructive — the original is unchanged.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Union",
+    "kind": "Method",
+    "detail": "Union(ARRAY two) IS ARRAY",
+    "documentation": "Returns a new array containing every element present in *either* the receiver or `two`. Duplicates appear only once.\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Unique",
+    "kind": "Method",
+    "detail": "Unique() — no result",
+    "documentation": "Discards duplicate elements in place and re-indexes the remaining elements. Order of first occurrences is preserved.\n\nModifies the receiver. For a non-destructive variant use `SortUnique()` (which also sorts).\n\n**Returns:** No result",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "Width",
+    "kind": "Method",
+    "detail": "Width() IS REAL",
+    "documentation": "Returns the maximum character width among the STRING elements in the array. Non-string elements are ignored.\n\nUseful for column-aligned text output.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "ARRAY"
+    ]
+  },
+  {
+    "name": "POSITION",
+    "kind": "Constructor",
+    "detail": "POSITION([STRING coords[, FORMAT]]) IS POSITION",
+    "documentation": "Constructs a POSITION (3D point in space). Holds East/North/Up components and an optional Origin DBREF.\n\n**Members:** `.East`, `.North`, `.Up` (REAL, get/set), `.Origin` (DBREF, get/set)\n\n**Construction:**\n```pml\n!p = POSITION('E 100 N 200 U 300')\n!p = OBJECT POSITION()\n```\n\n**Returns:** POSITION",
+    "receiver_types": []
+  },
+  {
+    "name": "WRT",
+    "kind": "Method",
+    "detail": "WRT(DBREF) IS POSITION|DIRECTION|ORIENTATION",
+    "documentation": "**With Respect To** — converts the receiver to a new geometry expressed relative to the supplied DB element. Available on POSITION, DIRECTION, and ORIENTATION.\n\n**Example:**\n```pml\n!localPos = !worldPos.WRT(!!CE)\n```\n\n**Returns:** Same type as receiver",
+    "receiver_types": [
+      "POSITION",
+      "DIRECTION",
+      "ORIENTATION"
+    ]
+  },
+  {
+    "name": "Component",
+    "kind": "Method",
+    "detail": "Component(DIRECTION) IS REAL",
+    "documentation": "Returns the magnitude of the receiver's component in the supplied DIRECTION (a scalar projection).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "Angle",
+    "kind": "Method",
+    "detail": "Angle(POSITION, POSITION) IS REAL  /  Angle(DIRECTION) IS REAL",
+    "documentation": "**On a POSITION:** angle between the two passed points as seen from the receiver.\n\n**On a DIRECTION:** angle between the receiver and the passed direction.\n\n**Returns:** REAL (angle)",
+    "receiver_types": [
+      "POSITION",
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "ArcCentre",
+    "kind": "Method",
+    "detail": "ArcCentre(POSITION, POSITION, DIRECTION, REAL) IS ARC",
+    "documentation": "Creates an ARC using the *arc centre* technique. The receiver is the centre. Direction is the 'normal viewing' direction.\n\n**Returns:** ARC",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "ArcFillet",
+    "kind": "Method",
+    "detail": "ArcFillet(POSITION, POSITION, DIRECTION, REAL) IS ARC",
+    "documentation": "Creates a fillet ARC tangent to the lines from the receiver to the two passed positions, with the given radius.\n\n**Returns:** ARC",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "ArcRadius",
+    "kind": "Method",
+    "detail": "ArcRadius(POSITION, POSITION, DIRECTION, REAL, BOOLEAN) IS ARC",
+    "documentation": "Creates an ARC using the *arc radius* technique. BOOLEAN selects minor (FALSE) or major (TRUE) arc.\n\n**Returns:** ARC",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "ArcThru",
+    "kind": "Method",
+    "detail": "ArcThru(POSITION, POSITION, DIRECTION[, REAL]) IS ARC",
+    "documentation": "Creates an ARC passing through 3 points (the receiver and two passed positions). Optional REAL specifies a radius.\n\n**Returns:** ARC",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "Arc3Lines",
+    "kind": "Method",
+    "detail": "Arc3Lines(LINE, LINE, LINE, DIRECTION) IS ARC",
+    "documentation": "Returns a circle through the 3 line tangent points. The receiver position indicates the zone in which the circle lies.\n\n**Returns:** ARC",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "MidPoint",
+    "kind": "Method",
+    "detail": "MidPoint(POSITION) IS POSITION",
+    "documentation": "Returns the midpoint between the receiver and the passed position.\n\n**Returns:** POSITION",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "Near",
+    "kind": "Method",
+    "detail": "Near(POSITION, REAL) IS BOOLEAN",
+    "documentation": "Returns TRUE if the passed position is within `REAL` distance of the receiver.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "Offset",
+    "kind": "Method",
+    "detail": "Offset(DIRECTION, REAL) IS POSITION",
+    "documentation": "Returns a new POSITION offset from the receiver by the supplied length in the supplied direction.\n\n**Returns:** POSITION",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "Plane",
+    "kind": "Method",
+    "detail": "Plane(POSITION, POSITION) IS PLANE",
+    "documentation": "Returns a PLANE containing the receiver and the two passed positions.\n\n**Returns:** PLANE",
+    "receiver_types": [
+      "POSITION"
+    ]
+  },
+  {
+    "name": "DIRECTION",
+    "kind": "Constructor",
+    "detail": "DIRECTION(STRING[, FORMAT]) IS DIRECTION",
+    "documentation": "Constructs a DIRECTION (unit vector in 3D space). Created from a coordinate STRING.\n\n**Construction:**\n```pml\n!d = DIRECTION('E 1 N 0 U 0')\n```\n\n**Returns:** DIRECTION",
+    "receiver_types": []
+  },
+  {
+    "name": "Bisect",
+    "kind": "Method",
+    "detail": "Bisect(DIRECTION) IS DIRECTION",
+    "documentation": "Returns the direction halfway between the receiver and the supplied direction.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "Cross",
+    "kind": "Method",
+    "detail": "Cross(DIRECTION) IS DIRECTION",
+    "documentation": "Returns the cross product of the receiver and the supplied direction.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "Dot",
+    "kind": "Method",
+    "detail": "Dot(DIRECTION) IS REAL",
+    "documentation": "Returns the dot product (scalar product) of the receiver and the supplied direction.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "IsParallel",
+    "kind": "Method",
+    "detail": "IsParallel(DIRECTION[, REAL tolerance]) IS BOOLEAN",
+    "documentation": "Returns TRUE if the receiver and the supplied direction are parallel. Optional `tolerance` allows fuzzy matching.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "IsPerpendicular",
+    "kind": "Method",
+    "detail": "IsPerpendicular(DIRECTION[, REAL tolerance]) IS BOOLEAN",
+    "documentation": "Returns TRUE if the receiver and the supplied direction are perpendicular. Optional `tolerance` allows fuzzy matching.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "Opposite",
+    "kind": "Method",
+    "detail": "Opposite() IS DIRECTION",
+    "documentation": "Returns the opposite (negated) direction.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "Orthogonal",
+    "kind": "Method",
+    "detail": "Orthogonal(DIRECTION) IS DIRECTION",
+    "documentation": "Returns a direction orthogonal to both the receiver and the supplied direction.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "Projected",
+    "kind": "Method",
+    "detail": "Projected(PLANE) IS DIRECTION",
+    "documentation": "Returns the receiver direction projected onto the passed plane.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "DIRECTION"
+    ]
+  },
+  {
+    "name": "ORIENTATION",
+    "kind": "Constructor",
+    "detail": "ORIENTATION(STRING[, FORMAT]) IS ORIENTATION",
+    "documentation": "Constructs an ORIENTATION (rotation in 3D space). Holds Alpha/Beta/Gamma rotation components and an optional Origin DBREF.\n\n**Members:** `.Alpha`, `.Beta`, `.Gamma` (REAL, get/set), `.Origin` (DBREF, get/set)\n\n**Returns:** ORIENTATION",
+    "receiver_types": []
+  },
+  {
+    "name": "XDir",
+    "kind": "Method",
+    "detail": "XDir() IS DIRECTION",
+    "documentation": "Returns the X axis component of the receiver as a DIRECTION.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "ORIENTATION"
+    ]
+  },
+  {
+    "name": "YDir",
+    "kind": "Method",
+    "detail": "YDir() IS DIRECTION",
+    "documentation": "Returns the Y axis component of the receiver as a DIRECTION.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "ORIENTATION"
+    ]
+  },
+  {
+    "name": "ZDir",
+    "kind": "Method",
+    "detail": "ZDir() IS DIRECTION",
+    "documentation": "Returns the Z axis component of the receiver as a DIRECTION.\n\n**Returns:** DIRECTION",
+    "receiver_types": [
+      "ORIENTATION"
+    ]
+  },
+  {
+    "name": "BORE",
+    "kind": "Constructor",
+    "detail": "BORE(REAL|STRING[, FORMAT]) IS BORE",
+    "documentation": "Constructs a BORE (pipe nominal size) object.\n\n**Member:** `.Size` (REAL, get/set)\n\n**Construction:**\n```pml\n!b = BORE(50)             -- numeric\n!b = BORE('50')           -- from STRING\n!b = BORE('50mm', !!fmt)  -- with FORMAT\n```\n\nComparison methods (`EQ`, `LT`, `GT`, `LEQ`, `GEQ`) work between BOREs and between a BORE and a REAL (using the current BORE units setting).\n\n**Returns:** BORE",
+    "receiver_types": []
+  },
+  {
+    "name": "BOOLEAN",
+    "kind": "Constructor",
+    "detail": "BOOLEAN(REAL|STRING[, FORMAT]) IS BOOLEAN",
+    "documentation": "Constructs a BOOLEAN.\n\n**Overloads:**\n- `BOOLEAN(!real)` — non-zero is TRUE, 0 is FALSE\n- `BOOLEAN(!str)` — TRUE for `'T'/'TR'/'TRU'/'TRUE'/'Y'/'YE'/'YES'`, FALSE for `'F'/'FA'/'FAL'/'FALS'/'FALSE'/'N'/'NO'`\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "AND",
+    "kind": "Method",
+    "detail": "<expr> AND <expr>  /  AND(BOOLEAN) IS BOOLEAN",
+    "documentation": "**PML 1 logical operator.** TRUE if both operands are TRUE.\n\nAlso available as the BOOLEAN method `AND()`.",
+    "receiver_types": [
+      "BOOLEAN"
+    ]
+  },
+  {
+    "name": "OR",
+    "kind": "Method",
+    "detail": "<expr> OR <expr>  /  OR(BOOLEAN) IS BOOLEAN",
+    "documentation": "**PML 1 logical operator.** TRUE if either operand is TRUE.\n\nAlso available as the BOOLEAN method `OR()`.",
+    "receiver_types": [
+      "BOOLEAN"
+    ]
+  },
+  {
+    "name": "NOT",
+    "kind": "Method",
+    "detail": "NOT <expr>  /  NOT() IS BOOLEAN",
+    "documentation": "**PML 1 logical operator.** Logical inverse.\n\nAlso available as the BOOLEAN method `NOT()`.",
+    "receiver_types": [
+      "BOOLEAN"
+    ]
+  },
+  {
+    "name": "BLOCK",
+    "kind": "Constructor",
+    "detail": "BLOCK(STRING expression) IS BLOCK",
+    "documentation": "Constructs a BLOCK — an unevaluated expression that can be evaluated later. Useful for deferred / data-driven evaluation patterns (e.g., supplied to `ARRAY.Evaluate()`).\n\n**Construction:**\n```pml\n!blk = BLOCK('!!CE.Description')\n!result = !blk.Evaluate()\n```\n\n**Returns:** BLOCK",
+    "receiver_types": []
+  },
+  {
+    "name": "FORMAT",
+    "kind": "Class",
+    "detail": "FORMAT — controls numeric/string/coordinate formatting",
+    "documentation": "Holds formatting settings used by other types when converting to/from STRING. The global `!!format` is used by methods that take a FORMAT argument.\n\n**Common members:**\n- `.DP` (REAL) — decimal places (default 2)\n- `.Units` ('MM' / 'M' / 'FINCH' / 'INCH') — distance output units\n- `.Dimension` ('NONE' / 'L' / 'L2' / 'L3') — physical dimension\n- `.ENU` (BOOLEAN) — TRUE: use ENU when outputting POSITIONs (default); FALSE: use XYZ\n- `.Fraction` (BOOLEAN) — output Imperial fractions vs decimal\n- `.Denominator` (REAL) — largest denominator for Imperial fractions (default 32)\n- `.CompSeparator` (STRING) — separator between components (default space)\n- `.Label` (STRING) — distance unit label (e.g. 'mm', 'm', '\"', 'IN')\n- `.FtLabel` (STRING) — feet label (default `'`)\n- `.InchSeparator` (STRING) — inches/fractions separator (default `.`)\n- `.PadFractions` (BOOLEAN) — pad fractions with trailing spaces\n- `.OriginExp` (BLOCK) — `''` (default), `'/*'` (World), or `'CE'` (Current Element)\n- `.Zeros` (BOOLEAN) — show leading zeroes for Imperial units (default TRUE)",
+    "receiver_types": []
+  },
+  {
+    "name": "DATETIME",
+    "kind": "Constructor",
+    "detail": "DATETIME([REAL|STRING year, REAL|STRING month, REAL date, ...]) IS DATETIME",
+    "documentation": "Constructs a DATETIME object.\n\n**Overloads:**\n- `DATETIME()` — current date and time\n- `DATETIME(!year, !month, !date)` — date only; time defaults to 00:00:00\n- `DATETIME(!year, !month, !date, !hour, !minute)` — seconds default to 0\n- `DATETIME(!year, !month, !date, !hour, !minute, !second)` — fully specified\n\n`!month` may be a REAL (1–12) or a STRING of at least 3 characters: `'Jan'`, `'March'`, `'DECEM'`, etc.\n\n**Returns:** DATETIME",
+    "receiver_types": []
+  },
+  {
+    "name": "DateTime",
+    "kind": "Method",
+    "detail": "DateTime([year, month, date[, hour, minute[, second]]]) IS DATETIME",
+    "documentation": "Instance-method form of the DATETIME constructor.\n\n**Returns:** DATETIME",
+    "receiver_types": []
+  },
+  {
+    "name": "Year",
+    "kind": "Method",
+    "detail": "Year() IS REAL",
+    "documentation": "Returns the year component of the DATETIME (e.g., 2026).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "Month",
+    "kind": "Method",
+    "detail": "Month() IS REAL",
+    "documentation": "Returns the month as a REAL (1–12). For the month name as a STRING, use `MonthString()`.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "MonthString",
+    "kind": "Method",
+    "detail": "MonthString() IS STRING",
+    "documentation": "Returns the month as a STRING (e.g. `'January'`, `'February'`).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "Date",
+    "kind": "Method",
+    "detail": "Date() IS REAL",
+    "documentation": "Returns the day of month (1–31).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "HOUR",
+    "kind": "Method",
+    "detail": "HOUR() IS REAL",
+    "documentation": "Returns the hour (0–23).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "Minute",
+    "kind": "Method",
+    "detail": "Minute() IS REAL",
+    "documentation": "Returns the minute (0–59).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "Second",
+    "kind": "Method",
+    "detail": "Second() IS REAL",
+    "documentation": "Returns the second (0–59).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "DATETIME"
+    ]
+  },
+  {
+    "name": "FILE",
+    "kind": "Constructor",
+    "detail": "FILE(STRING path) IS FILE",
+    "documentation": "Constructs a FILE object referring to a file or directory at the given path. The file does not need to exist yet.\n\n**Common operations:**\n```pml\n!f = FILE('/path/to/file.txt')\n!f.Open('READ')\n!line = !f.ReadRecord()\n!f.Close()\n```\n\nOr for whole-file reads:\n```pml\n!lines = !f.ReadFile()  -- returns ARRAY OF STRING\n```\n\n**Returns:** FILE",
+    "receiver_types": []
+  },
+  {
+    "name": "File",
+    "kind": "Method",
+    "detail": "File(STRING path) IS FILE",
+    "documentation": "Instance-method form of the FILE constructor.\n\n**Returns:** FILE",
+    "receiver_types": []
+  },
+  {
+    "name": "Open",
+    "kind": "Method",
+    "detail": "Open(STRING mode) — no result",
+    "documentation": "Opens the file. `mode` must be one of `'READ'`, `'WRITE'`, `'OVERWRITE'`, or `'APPEND'`.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Close",
+    "kind": "Method",
+    "detail": "Close() — no result",
+    "documentation": "Closes the file if currently open. Safe to call on a closed file.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "AccessMode",
+    "kind": "Method",
+    "detail": "AccessMode() IS STRING",
+    "documentation": "Returns the current access mode: `'CLOSED'`, `'READ'`, `'WRITE'`, `'OVERWRITE'`, or `'APPEND'`.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "IsOpen",
+    "kind": "Method",
+    "detail": "IsOpen() IS BOOLEAN",
+    "documentation": "Returns TRUE if the file is currently open.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Exists",
+    "kind": "Method",
+    "detail": "Exists() IS BOOLEAN",
+    "documentation": "Returns TRUE if the file represented by the receiver actually exists on disk.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Set",
+    "kind": "Method",
+    "detail": "Set() IS BOOLEAN",
+    "documentation": "Returns TRUE if the FILE object has a name set (i.e., was constructed with a path).\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "ReadRecord",
+    "kind": "Method",
+    "detail": "ReadRecord() IS STRING",
+    "documentation": "Reads one line from an open file and returns it. Returns an unset STRING when end-of-file is reached.\n\n**Returns:** STRING (unset at EOF)",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "WriteRecord",
+    "kind": "Method",
+    "detail": "WriteRecord(STRING) — no result",
+    "documentation": "Writes the STRING (followed by a newline) to the file. The file must already be open in WRITE/OVERWRITE/APPEND mode.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "ReadFile",
+    "kind": "Method",
+    "detail": "ReadFile([REAL maxLines]) IS ARRAY",
+    "documentation": "Convenience method: opens the file, reads its contents, closes it, and returns the lines as an ARRAY of STRING.\n\n**Overloads:**\n- `ReadFile()` — read all lines\n- `ReadFile(!max)` — fail if the file exceeds `!max` lines\n\n**Returns:** ARRAY OF STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "WriteFile",
+    "kind": "Method",
+    "detail": "WriteFile(STRING mode, ARRAY lines) — no result",
+    "documentation": "Convenience method: opens the file in `mode` (`'WRITE'`/`'OVERWRITE'`/`'APPEND'`), writes each STRING in `lines`, and closes the file.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "LineNumber",
+    "kind": "Method",
+    "detail": "LineNumber() IS REAL",
+    "documentation": "Returns the line number of the next line to be written (1-based).\n\n**Returns:** REAL",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Copy",
+    "kind": "Method",
+    "detail": "Copy(STRING|FILE destination) IS FILE",
+    "documentation": "Copies the file to the supplied destination path or FILE. Returns a FILE object pointing at the new copy.\n\n**Returns:** FILE",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Move",
+    "kind": "Method",
+    "detail": "Move(STRING|FILE destination) IS FILE",
+    "documentation": "Moves (renames) the file to the supplied destination. Returns a FILE object pointing at the new location.\n\n**Returns:** FILE",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "DeleteFile",
+    "kind": "Method",
+    "detail": "DeleteFile() — no result",
+    "documentation": "Deletes the file from disk. Note: removes the **actual file**, unlike DBREF.Delete() which only removes the PML reference.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Directory",
+    "kind": "Method",
+    "detail": "Directory() IS FILE",
+    "documentation": "Returns a FILE object representing the directory that owns this file.\n\n**Returns:** FILE (directory)",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Files",
+    "kind": "Method",
+    "detail": "Files() IS ARRAY OF FILE",
+    "documentation": "On a directory FILE, returns an ARRAY of FILE objects for the files contained in this directory.\n\n**Returns:** ARRAY OF FILE",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "SubDirs",
+    "kind": "Method",
+    "detail": "SubDirs() IS ARRAY OF FILE",
+    "documentation": "On a directory FILE, returns an ARRAY of FILE objects for sub-directories contained within.\n\n**Returns:** ARRAY OF FILE",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Path",
+    "kind": "Method",
+    "detail": "Path() IS ARRAY OF FILE",
+    "documentation": "Returns an ARRAY of FILE objects representing the chain of owning directories of this FILE, from root to immediate parent.\n\n**Returns:** ARRAY OF FILE",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "PathName",
+    "kind": "Method",
+    "detail": "PathName() IS STRING",
+    "documentation": "Returns the owning directory path as a STRING.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Entry",
+    "kind": "Method",
+    "detail": "Entry() IS STRING",
+    "documentation": "Returns the file's basename (without path).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "FullName",
+    "kind": "Method",
+    "detail": "FullName() IS STRING",
+    "documentation": "Returns the full path including filename as a STRING. (Also exists on gadgets, returning e.g. `'!!Form.gadget'`.)\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE",
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "Owner",
+    "kind": "Method",
+    "detail": "Owner() IS STRING|FORM",
+    "documentation": "**On a FILE:** returns the owner's ID as a STRING.\n\n**On a gadget:** returns the FORM that owns the gadget.\n\n**Returns:** STRING or FORM",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "DTM",
+    "kind": "Method",
+    "detail": "DTM() IS DATETIME",
+    "documentation": "Returns the file's last-modified timestamp as a DATETIME.\n\n**Returns:** DATETIME",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Type",
+    "kind": "Method",
+    "detail": "Type() IS STRING",
+    "documentation": "**On a FILE:** returns `'FILE'` or `'DIRECTORY'`.\n\n**On a gadget:** returns the gadget type as a STRING.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "Name",
+    "kind": "Method",
+    "detail": "Name() IS STRING",
+    "documentation": "Returns the name of the receiver as a STRING.\n\n- On a FILE: just the filename\n- On a gadget: the gadget's local name (e.g., `'gadget'`)\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FILE"
+    ]
+  },
+  {
+    "name": "DB",
+    "kind": "Constructor",
+    "detail": "DB(DBREF|STRING) IS DB",
+    "documentation": "Database object — represents a single PDMS/E3D database.\n\n**Members:** `.Name`, `.Description`, `.Access`, `.Claim`, `.File`, `.Foreign`, `.Number`, `.Team` (TEAM), `.Type`, `.Refno`, `.Primary` (all STRING except Team)\n\n**Construction:**\n```pml\n!d = OBJECT DB(!!CE)\n!d = !!CE.DB()\n```\n\n**Returns:** DB",
+    "receiver_types": []
+  },
+  {
+    "name": "MDB",
+    "kind": "Constructor",
+    "detail": "MDB(DBREF|STRING) IS MDB",
+    "documentation": "Multiple Database — a collection of DBs forming a working set.\n\n**Members:** `.Name`, `.Description`, `.Refno` (STRING)\n\n**Returns:** MDB",
+    "receiver_types": []
+  },
+  {
+    "name": "PROJECT",
+    "kind": "Class",
+    "detail": "PROJECT — current project info",
+    "documentation": "Represents a PDMS/E3D project. Access via `CURRENT PROJECT` or the `PROJECTS` command.\n\n**Members:** `.Name`, `.Evar` (project environment variable, e.g. `'SAM000'`)\n\n**Construction:**\n```pml\n!p = CURRENT PROJECT\n!arr = PROJECTS              -- all projects\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "USER",
+    "kind": "Constructor",
+    "detail": "USER(DBREF|STRING) IS USER",
+    "documentation": "Represents a project user.\n\n**Members:** `.Name`, `.Description`, `.Access` (`'FREE'`/`'GENERAL'`/`'RESTRICTED'`), `.Refno`\n\n**Construction:**\n```pml\n!u = OBJECT USER(!!CE)\n!arr = USERS                 -- all users in current project\n```\n\n**Returns:** USER",
+    "receiver_types": []
+  },
+  {
+    "name": "TEAM",
+    "kind": "Constructor",
+    "detail": "TEAM(DBREF|STRING) IS TEAM",
+    "documentation": "Represents a team — a group that owns databases and contains users.\n\n**Construction:**\n```pml\n!t = OBJECT TEAM(!!CE)\n!arr = TEAMS                 -- all teams\n```\n\n**Returns:** TEAM",
+    "receiver_types": []
+  },
+  {
+    "name": "SESSION",
+    "kind": "Constructor",
+    "detail": "SESSION(STRING uniqueId) IS SESSION",
+    "documentation": "Represents a database session.\n\n**Members:** `.UniqueID`, `.Name`, `.Login`, `.Host`, `.Entered`, `.LocationName` (STRING get/set), `.IsRemote` (STRING), `.IsCurrent` (BOOLEAN)\n\n**Returns:** SESSION",
+    "receiver_types": []
+  },
+  {
+    "name": "DBSESS",
+    "kind": "Class",
+    "detail": "DBSESS — database session info",
+    "documentation": "Holds session info for a specific database. Returned by `DB.Sessions()` and `DB.Lastsession()`.",
+    "receiver_types": []
+  },
+  {
+    "name": "MDBList",
+    "kind": "Method",
+    "detail": "MDBList() IS ARRAY",
+    "documentation": "Returns an array of MDBs that contain this DB (DB receiver) or all MDBs in the project (PROJECT receiver).\n\n**Returns:** ARRAY",
+    "receiver_types": [
+      "DB",
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Sessions",
+    "kind": "Method",
+    "detail": "Sessions() IS ARRAY OF DBSESS",
+    "documentation": "Returns all sessions of this database.\n\n**Returns:** ARRAY OF DBSESS",
+    "receiver_types": [
+      "DB",
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Lastsession",
+    "kind": "Method",
+    "detail": "Lastsession() IS DBSESS",
+    "documentation": "Returns last session info for this database.\n\n**Returns:** DBSESS",
+    "receiver_types": [
+      "DB"
+    ]
+  },
+  {
+    "name": "Current",
+    "kind": "Method",
+    "detail": "Current() IS ARRAY OF DB  /  Current() IS ARRAY OF DB (SESSION)",
+    "documentation": "Returns current databases as an ARRAY of DB objects.\n\n**Returns:** ARRAY OF DB",
+    "receiver_types": [
+      "MDB",
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Deferred",
+    "kind": "Method",
+    "detail": "Deferred() IS ARRAY OF DB",
+    "documentation": "Returns deferred databases as an ARRAY of DB objects.\n\n**Returns:** ARRAY OF DB",
+    "receiver_types": [
+      "MDB",
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Mode",
+    "kind": "Method",
+    "detail": "Mode() IS ARRAY OF STRING",
+    "documentation": "Returns access modes (`'NR'` or `'RW'`) for each current DB of the MDB or SESSION.\n\n**Returns:** ARRAY OF STRING",
+    "receiver_types": [
+      "MDB",
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Active",
+    "kind": "Method",
+    "detail": "Active() IS REAL",
+    "documentation": "Returns the number of active users in the project.\n\n**Returns:** REAL",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Code",
+    "kind": "Method",
+    "detail": "Code() IS STRING",
+    "documentation": "Returns the project's 3-character code, e.g. `'SAM'`.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Description",
+    "kind": "Method",
+    "detail": "Description() IS STRING",
+    "documentation": "Returns project description (up to 120 characters).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Mbcharset",
+    "kind": "Method",
+    "detail": "Mbcharset() IS STRING",
+    "documentation": "Returns the multibyte charset number.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Message",
+    "kind": "Method",
+    "detail": "Message() IS STRING",
+    "documentation": "Returns the project's information message (up to 120 characters).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Number",
+    "kind": "Method",
+    "detail": "Number() IS STRING",
+    "documentation": "Returns the project number (up to 17 characters).\n\n**Returns:** STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Isglobal",
+    "kind": "Method",
+    "detail": "Isglobal() IS BOOLEAN",
+    "documentation": "Returns TRUE if the project is global.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Locations",
+    "kind": "Method",
+    "detail": "Locations() IS ARRAY OF LOCATION",
+    "documentation": "Returns all LOCATIONs in the project.\n\n**Returns:** ARRAY OF LOCATION",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "CurrentLocation",
+    "kind": "Method",
+    "detail": "CurrentLocation() IS LOCATION",
+    "documentation": "Returns the current LOCATION.\n\n**Returns:** LOCATION",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "CurrentSession",
+    "kind": "Method",
+    "detail": "CurrentSession() IS SESSION",
+    "documentation": "Returns the current SESSION.\n\n**Returns:** SESSION",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Dblist",
+    "kind": "Method",
+    "detail": "Dblist() IS ARRAY OF DB",
+    "documentation": "Returns all databases in the project (PROJECT) or owned by the team (TEAM).\n\n**Returns:** ARRAY OF DB",
+    "receiver_types": [
+      "PROJECT",
+      "TEAM"
+    ]
+  },
+  {
+    "name": "UserList",
+    "kind": "Method",
+    "detail": "UserList() IS ARRAY OF USER",
+    "documentation": "Returns the list of USERs (PROJECT or TEAM scope).\n\n**Returns:** ARRAY OF USER",
+    "receiver_types": [
+      "PROJECT",
+      "TEAM"
+    ]
+  },
+  {
+    "name": "Macros",
+    "kind": "Method",
+    "detail": "Macros() IS ARRAY OF MACRO",
+    "documentation": "Returns all inter-db macros in the MISC db.\n\n**Returns:** ARRAY OF MACRO",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "Messages",
+    "kind": "Method",
+    "detail": "Messages() IS ARRAY OF STRING",
+    "documentation": "Returns all messages in the MISC db.\n\n**Returns:** ARRAY OF STRING",
+    "receiver_types": [
+      "PROJECT"
+    ]
+  },
+  {
+    "name": "TeamList",
+    "kind": "Method",
+    "detail": "TeamList() IS ARRAY OF TEAM",
+    "documentation": "Returns the list of TEAMs that include this USER.\n\n**Returns:** ARRAY OF TEAM",
+    "receiver_types": [
+      "USER"
+    ]
+  },
+  {
+    "name": "WorkingList",
+    "kind": "Method",
+    "detail": "WorkingList() IS ARRAY OF DB",
+    "documentation": "Returns working extract DBs owned by this USER.\n\n**Returns:** ARRAY OF DB",
+    "receiver_types": [
+      "USER"
+    ]
+  },
+  {
+    "name": "Password",
+    "kind": "Method",
+    "detail": "Password() IS STRING",
+    "documentation": "**No value** — password is not retrievable for security reasons.\n\n**Returns:** STRING (always empty)",
+    "receiver_types": [
+      "USER"
+    ]
+  },
+  {
+    "name": "ConfirmID",
+    "kind": "Method",
+    "detail": "ConfirmID(STRING password) IS BOOLEAN",
+    "documentation": "Returns TRUE if the supplied password (must include leading `/`) matches the currently logged-in user.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Location",
+    "kind": "Method",
+    "detail": "Location() IS LOCATION",
+    "documentation": "Returns the LOCATION the SESSION applies to. NULL or error in non-Global projects.\n\n**Returns:** LOCATION",
+    "receiver_types": [
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Modified",
+    "kind": "Method",
+    "detail": "Modified() IS BOOLEAN",
+    "documentation": "Returns TRUE if the database has been modified.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Module",
+    "kind": "Method",
+    "detail": "Module() IS STRING",
+    "documentation": "Returns the name of the current module.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "SESSION"
+    ]
+  },
+  {
+    "name": "Status",
+    "kind": "Method",
+    "detail": "Status() IS ARRAY OF STRING",
+    "documentation": "Returns current access modes (`'R'`/`'RW'`/`'N'`) for each of the current DBs.\n\n**Returns:** ARRAY OF STRING",
+    "receiver_types": [
+      "SESSION"
+    ]
+  },
+  {
+    "name": "BADREF",
+    "kind": "Function",
+    "detail": "BADREF(id) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** Returns TRUE if `id` is invalid (e.g., equals NULREF).\n\n**Example:** `BADREF(/NONEXISTENT)` → TRUE\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "DEFINED",
+    "kind": "Function",
+    "detail": "DEFINED(variable[, index]) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** With one argument, TRUE if a scalar/array variable or array element exists. With two arguments, TRUE if the array has a value at the supplied index.\n\n`UNDEFINED(!foo)` is equivalent to `NOT DEFINED(!foo)`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "UNDEFINED",
+    "kind": "Function",
+    "detail": "UNDEFINED(variable[, index]) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** Inverse of `DEFINED`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "CREATED",
+    "kind": "Function",
+    "detail": "CREATED IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** TRUE if the element has been created since the comparison date.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "DELETED",
+    "kind": "Function",
+    "detail": "DELETED IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** TRUE if the element has been deleted since the comparison date.\n\nNot implemented in PML 2 expressions.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "EMPTY",
+    "kind": "Function",
+    "detail": "EMPTY(text) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** TRUE if `text` is a zero-length STRING.\n\n**Example:** `EMPTY('')` → TRUE\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "MATCHWILD",
+    "kind": "Function",
+    "detail": "MATCHWILD(text1, text2[, multi[, single]]) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** Tests whether `text1` matches the wildcard pattern `text2`. Defaults: `*` for many, `?` for single. Optional 3rd/4th args override these wildcards.\n\n**Example:** `MATCHWILD('A big bottle','*big*')` → TRUE\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "UNSET",
+    "kind": "Function",
+    "detail": "UNSET(value) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** TRUE if `value` is unset. Works on any data type.\n\n**Example:** `UNSET(DESC)` → TRUE if DESC is unset.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "VLOGICAL",
+    "kind": "Function",
+    "detail": "VLOGICAL(variable[, index]) IS BOOLEAN",
+    "documentation": "**PML 1 expression function.** Late-evaluates a variable, returning a BOOLEAN. STRING values: `'T'`/`'TR'`/`'TRU'`/`'TRUE'`/non-zero numbers → TRUE; `'F'`/`'FALSE'`/`0` → FALSE.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "VTEXT",
+    "kind": "Function",
+    "detail": "VTEXT(variable[, index]) IS STRING",
+    "documentation": "**PML 1 expression function.** Late-evaluates a variable, returning a STRING.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "VVALUE",
+    "kind": "Function",
+    "detail": "VVALUE(variable[, index]) IS REAL",
+    "documentation": "**PML 1 expression function.** Late-evaluates a variable, returning a REAL.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ACOS",
+    "kind": "Function",
+    "detail": "ACOS(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Arc cosine in degrees. Argument must be in [-1.0, 1.0].\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ASIN",
+    "kind": "Function",
+    "detail": "ASIN(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Arc sine in degrees. Argument must be in [-1.0, 1.0].\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ATAN",
+    "kind": "Function",
+    "detail": "ATAN(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Arc tangent in degrees.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ATANT",
+    "kind": "Function",
+    "detail": "ATANT(number1, number2) IS REAL",
+    "documentation": "**PML 1 expression function.** `atan2`-style arc tangent: returns the angle of `number1/number2` with appropriate sign and quadrant. Useful when the divisor may be zero.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ALOG",
+    "kind": "Function",
+    "detail": "ALOG(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Exponential function (natural anti-log) of a number.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ARRAYSIZE",
+    "kind": "Function",
+    "detail": "ARRAYSIZE(variable_name) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the size of an array variable.\n\n**Example:** `ARRAYSIZE(!arr)` → 2.0\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "ARRAYWIDTH",
+    "kind": "Function",
+    "detail": "ARRAYWIDTH(variable_name) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the largest character width among string elements in the named array.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "COMPONENT",
+    "kind": "Function",
+    "detail": "COMPONENT direction OF position IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the magnitude of a vector from origin to `position`, projected onto `direction`.\n\n**Example:** `COMP E45 N OF N0 E100 U50` → 70.71\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "SIN",
+    "kind": "Function",
+    "detail": "SIN(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Sine of a number (in degrees).\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "COS",
+    "kind": "Function",
+    "detail": "COS(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Cosine of a number (in degrees).\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "TAN",
+    "kind": "Function",
+    "detail": "TAN(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Tangent of a number (in degrees).\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "LENGTH",
+    "kind": "Function",
+    "detail": "LENGTH(text) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the length of a STRING.\n\n**Example:** `LENGTH('abcdef')` → 6\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "DLENGTH",
+    "kind": "Function",
+    "detail": "DLENGTH(text) IS REAL",
+    "documentation": "**PML 1 expression function.** Length using displayed-width counting (multibyte characters).\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "MATCH",
+    "kind": "Function",
+    "detail": "MATCH(text1, text2) IS REAL",
+    "documentation": "**PML 1 expression function.** Position of leftmost occurrence of `text2` in `text1`, or 0 if not found.\n\n**Example:** `MATCH('abcdef','cd')` → 3\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "DMATCH",
+    "kind": "Function",
+    "detail": "DMATCH(text1, text2) IS REAL",
+    "documentation": "**PML 1 expression function.** Multibyte-aware version of `MATCH`.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "MAX",
+    "kind": "Function",
+    "detail": "MAX(number1, number2[, ...]) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the maximum of the arguments.\n\n**Example:** `MAX(1, 3.4)` → 3.4\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "MIN",
+    "kind": "Function",
+    "detail": "MIN(number1, number2[, ...]) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the minimum of the arguments.\n\n**Example:** `MIN(7.6, -12.33, 2.3)` → -12.33\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "NEGATE",
+    "kind": "Function",
+    "detail": "NEGATE(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Multiplies a number by -1.0.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "NINT",
+    "kind": "Function",
+    "detail": "NINT(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Nearest integer to a real. NINT(N+0.5) rounds away from zero for positive N.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "OCCUR",
+    "kind": "Function",
+    "detail": "OCCUR(text1, text2) IS REAL",
+    "documentation": "**PML 1 expression function.** Returns the number of times `text2` occurs in `text1`.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "POWER",
+    "kind": "Function",
+    "detail": "POWER(number1, number2) IS REAL",
+    "documentation": "**PML 1 expression function.** `number1 ^ number2`.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "SQRT",
+    "kind": "Function",
+    "detail": "SQRT(number) IS REAL",
+    "documentation": "**PML 1 expression function.** Square root. Argument must be non-negative.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "AFTER",
+    "kind": "Function",
+    "detail": "AFTER(text1, text2) IS STRING",
+    "documentation": "**PML 1 expression function.** Returns the substring of `text1` after the leftmost occurrence of `text2`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "BEFORE",
+    "kind": "Function",
+    "detail": "BEFORE(text1, text2) IS STRING",
+    "documentation": "**PML 1 expression function.** Returns the substring of `text1` before the leftmost occurrence of `text2`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "LOWCASE",
+    "kind": "Function",
+    "detail": "LOWCASE(text) IS STRING",
+    "documentation": "**PML 1 expression function.** Returns the lowercased STRING.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "PART",
+    "kind": "Function",
+    "detail": "PART(text, nth[, delimiter]) IS STRING",
+    "documentation": "**PML 1 expression function.** Returns the `nth` whitespace- or delimiter-separated field.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "REPLACE",
+    "kind": "Function",
+    "detail": "REPLACE(text1, text2, text3[, nth[, count]]) IS STRING",
+    "documentation": "**PML 1 expression function.** Replace occurrences of `text2` in `text1` with `text3`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "STRINGFROM",
+    "kind": "Function",
+    "detail": "STRING(value[, format]) IS STRING",
+    "documentation": "**PML 1 expression function.** Convert numeric/positional value to STRING. Equivalent to the `STRING(...)` constructor.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "SUBSTRING",
+    "kind": "Function",
+    "detail": "SUBSTRING(text, index[, length]) IS STRING",
+    "documentation": "**PML 1 expression function.** Return substring starting at `index`, optionally `length` characters long.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "SUBS",
+    "kind": "Function",
+    "detail": "SUBS(text, index[, length]) IS STRING",
+    "documentation": "**PML 1 expression function.** Short alias for `SUBSTRING`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "LENG",
+    "kind": "Function",
+    "detail": "LENG(text) IS REAL",
+    "documentation": "**PML 1 expression function.** Short alias for `LENGTH`.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "UPCASE",
+    "kind": "Function",
+    "detail": "UPCASE(text) IS STRING",
+    "documentation": "**PML 1 expression function.** Returns the uppercased STRING. Capitalised form of the STRING method `UpCase`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "TRIM",
+    "kind": "Function",
+    "detail": "TRIM(text[, mode[, char]]) IS STRING",
+    "documentation": "**PML 1 expression function.** Removes leading/trailing whitespace, or compresses repeated characters. Modes: `'L'`, `'R'`, `'LR'`, `'M'`.\n\n**Returns:** STRING",
+    "receiver_types": []
+  },
+  {
+    "name": "NE",
+    "kind": "Operator",
+    "detail": "<expr> NE <expr>",
+    "documentation": "**PML 1 inequality operator.** TRUE if the two values are not equal.",
+    "receiver_types": []
+  },
+  {
+    "name": "LE",
+    "kind": "Operator",
+    "detail": "<expr> LE <expr>",
+    "documentation": "**PML 1 less-than-or-equal operator.**",
+    "receiver_types": []
+  },
+  {
+    "name": "GE",
+    "kind": "Operator",
+    "detail": "<expr> GE <expr>",
+    "documentation": "**PML 1 greater-than-or-equal operator.**",
+    "receiver_types": []
+  },
+  {
+    "name": "TRUE",
+    "kind": "Function",
+    "detail": "TRUE — boolean constant",
+    "documentation": "**PML 1 constant.** Boolean TRUE. Aliases: `ON`, `YES`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "FALSE",
+    "kind": "Function",
+    "detail": "FALSE — boolean constant",
+    "documentation": "**PML 1 constant.** Boolean FALSE. Aliases: `OFF`, `NO`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "ON",
+    "kind": "Function",
+    "detail": "ON — alias for TRUE",
+    "documentation": "**PML 1 constant.** Alias for `TRUE`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "OFF",
+    "kind": "Function",
+    "detail": "OFF — alias for FALSE",
+    "documentation": "**PML 1 constant.** Alias for `FALSE`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "YES",
+    "kind": "Function",
+    "detail": "YES — alias for TRUE",
+    "documentation": "**PML 1 constant.** Alias for `TRUE`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "NO",
+    "kind": "Function",
+    "detail": "NO — alias for FALSE",
+    "documentation": "**PML 1 constant.** Alias for `FALSE`.\n\n**Returns:** BOOLEAN",
+    "receiver_types": []
+  },
+  {
+    "name": "PI",
+    "kind": "Function",
+    "detail": "PI — 3.14159265…",
+    "documentation": "**PML 1 constant.** Mathematical π.\n\n**Returns:** REAL",
+    "receiver_types": []
+  },
+  {
+    "name": "UNSETPI",
+    "kind": "Function",
+    "detail": "UNSET — sentinel undefined value",
+    "documentation": "**PML 1 sentinel.** The undefined value. Test with `UNSET(value)`.",
+    "receiver_types": []
+  },
+  {
+    "name": "Shown",
+    "kind": "Method",
+    "detail": "Shown() IS BOOLEAN",
+    "documentation": "Returns TRUE if the gadget is currently shown.\n\n**Returns:** BOOLEAN",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "SetFocus",
+    "kind": "Method",
+    "detail": "SetFocus() — no result",
+    "documentation": "Moves keyboard focus to this gadget.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "Refresh",
+    "kind": "Method",
+    "detail": "Refresh() — no result",
+    "documentation": "Refreshes the gadget's display.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "Background",
+    "kind": "Method",
+    "detail": "Background() IS STRING",
+    "documentation": "Returns the gadget's background colour name. Raises an error if the colour was not set explicitly or is showing a pixmap.\n\n**Returns:** STRING",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "SetToolTip",
+    "kind": "Method",
+    "detail": "SetToolTip(STRING) — no result",
+    "documentation": "Sets the gadget's tooltip text.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "SetPopup",
+    "kind": "Method",
+    "detail": "SetPopup(MENU) — no result",
+    "documentation": "Links a MENU to the gadget as a popup.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "RemovePopup",
+    "kind": "Method",
+    "detail": "RemovePopup(MENU) — no result",
+    "documentation": "Removes a popup MENU from the gadget.\n\n**Returns:** No result",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "GetPickedPopup",
+    "kind": "Method",
+    "detail": "GetPickedPopup() IS MENU",
+    "documentation": "Returns the MENU that was last picked from a popup.\n\n**Returns:** MENU",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "BAR",
+      "FRAME",
+      "TEXT",
+      "LIST",
+      "MENU",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "PARAGRAPH",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "AddPixmap",
+    "kind": "Method",
+    "detail": "AddPixmap(STRING file1[, STRING file2[, STRING file3]]) — no result",
+    "documentation": "Adds pixmap files for the unselected, selected, and inactive states of a button-style gadget. Last two args are optional.\n\n**Returns:** No result",
+    "receiver_types": [
+      "BUTTON",
+      "PARAGRAPH",
+      "TOGGLE"
+    ]
+  },
+  {
+    "name": "FORM",
+    "kind": "Class",
+    "detail": "FORM — owns gadgets and lays them out",
+    "documentation": "Top-level gadget container. Forms are PML objects defined in `.pmlfrm` files using `setup form` blocks.\n\n**Form lifecycle methods you'll define:**\n- Default constructor (no-args method named after the form) — initial setup\n- `OK`, `CANCEL`, `APPLY`, `RESET`, `HELP` callbacks for control-type buttons\n- Per-gadget callbacks specified in the gadget's `CALLback` attribute\n\nOpen a form with `SHOW !!FormName` and close it with `HIDE !!FormName` or `RETURN`.",
+    "receiver_types": []
+  },
+  {
+    "name": "ERROR",
+    "kind": "Class",
+    "detail": "ERROR — error info inside HANDLE blocks",
+    "documentation": "Inside a `handle ANY ... endhandle` block, the global `!!Error` provides info about the caught error.\n\n**Common members:**\n- `!!Error.text` — error message STRING\n- `!!Error.code` — numeric error code\n- `!!Error.line` — source line number\n- `!!Error.value` — additional context\n\n**Example:**\n```pml\nhandle ANY\n    $p Caught: $!!Error.text\nendhandle\n```",
+    "receiver_types": []
+  },
+  {
+    "name": "ALERT",
+    "kind": "Class",
+    "detail": "ALERT — modal dialog boxes",
+    "documentation": "Provides modal dialog boxes for user notifications and prompts.\n\n**Common forms:**\n- `!!Alert.Message('text')` — informational popup\n- `!!Alert.Warning('text')` — warning popup\n- `!!Alert.Error('text')` — error popup\n- `!!Alert.Question('text')` — yes/no prompt, returns BOOLEAN\n- `!!Alert.Confirm('text')` — confirm/cancel prompt",
+    "receiver_types": []
+  },
+  {
+    "name": "COLLECTION",
+    "kind": "Class",
+    "detail": "COLLECTION — element collections / iterators",
+    "documentation": "Used to query and iterate over groups of database elements matching specified criteria. Often paired with EXPRESSION objects to filter results.",
+    "receiver_types": []
+  },
+  {
+    "name": "EXPRESSION",
+    "kind": "Class",
+    "detail": "EXPRESSION — reusable expression object",
+    "documentation": "Defines a basic expression that can be applied against a database element or another object. Used by COLLECTION objects to filter results.",
+    "receiver_types": []
+  },
+  {
+    "name": "EVENT",
+    "kind": "Class",
+    "detail": "EVENT — UI event info",
+    "documentation": "Information about UI events triggered by gadgets — `SELECT`, `MODIFIED`, `HIDDEN`, `SHOWN`, etc.\n\nAccessed via `!!Event` inside an open callback.",
+    "receiver_types": []
+  },
+  {
+    "name": "BANNER",
+    "kind": "Class",
+    "detail": "BANNER — application/branding info",
+    "documentation": "Application banner info. Members: `.Company`, `.Copyright`, `.Libraries` (ARRAY), `.Name`, `.Short`, `.Status` (all STRING).\n\nObtain via `!BANNVAR = BANNER!`.",
+    "receiver_types": []
+  }
+]
