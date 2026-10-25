@@ -2684,5 +2684,50 @@
     "detail": "BANNER — application/branding info",
     "documentation": "Application banner info. Members: `.Company`, `.Copyright`, `.Libraries` (ARRAY), `.Name`, `.Short`, `.Status` (all STRING).\n\nObtain via `!BANNVAR = BANNER!`.",
     "receiver_types": []
+  },
+  {
+    "name": "Show",
+    "kind": "Method",
+    "detail": "Show() / Show('At', !x, !y) / Show('Cen', !x, !y) / Show('Free')",
+    "documentation": "Displays the form. With no arguments the form appears at its default position; `'At'` and `'Cen'` place its top-left corner or centre at screen fractions `!x`, `!y`; `'Free'` lets the window manager place it.\n\n```pml\n!!myForm.show()\n!!myForm.show('At', 0.3, 0.3)\n```",
+    "receiver_types": [
+      "FORM"
+    ]
+  },
+  {
+    "name": "Hide",
+    "kind": "Method",
+    "detail": "Hide()",
+    "documentation": "Removes the form from the screen. Its gadgets keep their values.\n\n```pml\n!!myForm.hide()\n```",
+    "receiver_types": [
+      "FORM"
+    ]
+  },
+  {
+    "name": "SetActive",
+    "kind": "Method",
+    "detail": "SetActive(BOOLEAN)",
+    "documentation": "Greys out (FALSE) or re-enables (TRUE) the form or gadget.\n\n```pml\n!this.okButton.setActive(FALSE)\n```",
+    "receiver_types": [
+      "FORM",
+      "BUTTON",
+      "TEXT",
+      "LIST",
+      "OPTION",
+      "TOGGLE",
+      "RADIO",
+      "FRAME",
+      "NUMERICINPUT",
+      "FILECONTROL"
+    ]
+  },
+  {
+    "name": "KeyboardFocus",
+    "kind": "Method",
+    "detail": "KeyboardFocus() IS GADGET",
+    "documentation": "The gadget that currently has keyboard focus. Assign a gadget to move the focus:\n\n```pml\n!this.keyboardFocus = !this.name\n```",
+    "receiver_types": [
+      "FORM"
+    ]
   }
 ]

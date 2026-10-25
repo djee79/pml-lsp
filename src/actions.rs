@@ -121,14 +121,19 @@ pub fn is_handleable(line: &str) -> bool {
 
 /// Reformat the whole file as a source action.
 pub fn format_document(uri: &Url, edits: Vec<TextEdit>) -> Option<CodeAction> {
+    source_action(uri, "Format document", CodeActionKind::SOURCE_FIX_ALL, edits)
+}
+
+/// A whole-file action made of `edits`; none when there is nothing to change.
+pub fn source_action(uri: &Url, title: &str, kind: CodeActionKind, edits: Vec<TextEdit>) -> Option<CodeAction> {
     if edits.is_empty() {
         return None;
     }
     let mut changes = HashMap::new();
     changes.insert(uri.clone(), edits);
     Some(CodeAction {
-        title: "Fix indentation".to_string(),
-        kind: Some(CodeActionKind::SOURCE_FIX_ALL),
+        title: title.to_string(),
+        kind: Some(kind),
         edit: Some(WorkspaceEdit { changes: Some(changes), ..Default::default() }),
         ..Default::default()
     })

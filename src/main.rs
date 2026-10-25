@@ -20,6 +20,7 @@ mod actions;
 mod context;
 mod diagnostics;
 mod format;
+mod lint;
 mod parser;
 mod references;
 mod semantic;
@@ -29,6 +30,7 @@ mod types;
 mod workspace;
 
 use context::{Context, Decl};
+use format::KeywordCase;
 use dashmap::DashMap;
 use parser::PmlParser;
 use serde::Deserialize;
@@ -164,6 +166,43 @@ fn load_builtins() -> Vec<Builtin> {
 }
 
 // =============================================================================
+// Settings
+// =============================================================================
+
+/// User configuration, from `initializationOptions` or
+/// `workspace/didChangeConfiguration` (either flat or under a `pml` key).
+#[derive(Clone, Debug)]
+struct Settings {
+    /// Respell keywords when formatting. Default: leave them alone.
+    keyword_case: KeywordCase,
+    unused_variables: bool,
+    unknown_methods: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings { keyword_case: KeywordCase::Keep, unused_variables: true, unknown_methods: true }
+    }
+}
+
+impl Settings {
+    fn apply_json(&mut self, value: &serde_json::Value) {
+        if let Some(inner) = value.get("pml") {
+            self.apply_json(inner);
+        }
+        if let Some(case) = value.get("keywordCase").and_then(|v| v.as_str()).and_then(KeywordCase::parse) {
+            self.keyword_case = case;
+        }
+        if let Some(b) = value.get("unusedVariables").and_then(|v| v.as_bool()) {
+            self.unused_variables = b;
+        }
+        if let Some(b) = value.get("unknownMethods").and_then(|v| v.as_bool()) {
+            self.unknown_methods = b;
+        }
+    }
+}
+
+// =============================================================================
 // Documents and workspace
 // =============================================================================
 
@@ -193,20 +232,45 @@ struct Backend {
     roots: Mutex<Vec<PathBuf>>,
     builtins: Arc<Vec<Builtin>>,
     parser: Arc<PmlParser>,
+    settings: Mutex<Settings>,
 }
 
 impl Backend {
     /// Parse, extract symbols, publish diagnostics. Called on open and change.
     async fn update(&self, uri: Url, text: String) {
         let tree = self.parser.parse(&text);
-        let (symbols, diags) = match &tree {
-            Some(t) => (SymbolTable::extract(t, &text), diagnostics::collect(t, &text)),
-            None => (SymbolTable::default(), Vec::new()),
-        };
-        let symbols = Arc::new(symbols);
+        let symbols = Arc::new(tree.as_ref().map(|t| SymbolTable::extract(t, &text)).unwrap_or_default());
         self.workspace.insert(uri.clone(), symbols.clone());
-        self.documents.insert(uri.clone(), Document { text, symbols });
+        self.documents.insert(uri.clone(), Document { text: text.clone(), symbols: symbols.clone() });
+        let diags = self.diagnostics(&uri, tree.as_ref(), &text, &symbols);
         self.client.publish_diagnostics(uri, diags, None).await;
+    }
+
+    /// Syntax errors plus the lints enabled in the settings.
+    fn diagnostics(&self, uri: &Url, tree: Option<&tree_sitter::Tree>, text: &str, symbols: &SymbolTable) -> Vec<Diagnostic> {
+        let Some(tree) = tree else { return Vec::new() };
+        let settings = self.settings.lock().unwrap().clone();
+        let mut diags = diagnostics::collect(tree, text);
+        if settings.unused_variables {
+            diags.extend(lint::unused_variables(tree, text));
+        }
+        if settings.unknown_methods {
+            let tables = self.tables(uri);
+            let env = TypeEnv { tables: &tables, builtins: &self.builtins, text, symbols };
+            diags.extend(lint::unknown_methods(tree, text, &env));
+        }
+        diags
+    }
+
+    /// Re-publish diagnostics of every open document, after the index or the
+    /// settings changed.
+    async fn relint_open(&self) {
+        let open: Vec<(Url, Document)> = self.documents.iter().map(|e| (e.key().clone(), e.value().clone())).collect();
+        for (uri, doc) in open {
+            let tree = self.parser.parse(&doc.text);
+            let diags = self.diagnostics(&uri, tree.as_ref(), &doc.text, &doc.symbols);
+            self.client.publish_diagnostics(uri, diags, None).await;
+        }
     }
 
     /// Index `dir` on a worker thread and merge the result into the workspace.
@@ -233,6 +297,7 @@ impl Backend {
         self.client
             .log_message(MessageType::INFO, format!("pml-lsp: indexed {} PML files under {}", count, shown))
             .await;
+        self.relint_open().await;
     }
 
     /// Re-index one file that changed on disk (and is not open).
@@ -400,13 +465,62 @@ impl<'a> types::Env for TypeEnv<'a> {
     }
 }
 
+/// Methods every PML object has, so they are never reported as unknown.
+const UNIVERSAL_METHODS: &[&str] = &[
+    "delete", "equals", "eq", "neq", "ne", "geq", "ge", "leq", "le", "gt", "lt", "objecttype", "set", "unset", "string",
+    "evaluate", "type", "attribute", "attributes", "unsetvalue",
+];
+
+/// Methods of every form, beyond what builtins.json lists.
+const FORM_METHODS: &[&str] = &[
+    "show", "hide", "setactive", "keyboardfocus", "refresh", "setfocus", "shown", "fullname", "newmenu", "setpopup",
+    "removepopup", "getpickedpopup", "okcall", "cancelcall", "initcall", "quitcall", "firstshowncall", "killingcall",
+    "formtitle", "formrevision", "icontitle", "background", "pos", "callback", "formtype", "visible", "active",
+];
+
+/// Is `method` one every object (or, for forms, every form) has?
+fn is_universal_method(owner_is_form: bool, method: &str) -> bool {
+    let lc = method.trim_start_matches('.').to_ascii_lowercase();
+    UNIVERSAL_METHODS.contains(&lc.as_str()) || (owner_is_form && FORM_METHODS.contains(&lc.as_str()))
+}
+
+impl<'a> lint::Resolver for TypeEnv<'a> {
+    /// Only user objects and forms are checked: their methods are all in the
+    /// indexed definitions. Builtin receivers return `None` because
+    /// builtins.json is not an exhaustive method list.
+    fn method_defined(&self, receiver: &str, method: &str) -> Option<(String, bool)> {
+        let type_name = types::infer(receiver, self)?;
+        let (home, owner) = self.tables.iter().enumerate().find_map(|(i, (_, t))| {
+            t.iter()
+                .find(|s| matches!(s.kind, SymbolKind::Object | SymbolKind::Form) && s.matches(&type_name))
+                .cloned()
+                .map(|s| (i, s))
+        })?;
+        let is_form = owner.kind == SymbolKind::Form;
+        let builtin_name = |b: &Builtin| b.name.split('(').next().unwrap_or(&b.name).eq_ignore_ascii_case(method);
+        let known = is_universal_method(is_form, method)
+            || (is_form && self.builtins.iter().any(|b| b.is_member() && b.applies_to(Some("FORM")) && builtin_name(b)))
+            || self.tables.iter().enumerate().any(|(i, (_, t))| {
+                t.iter().any(|s| {
+                    s.kind == SymbolKind::Method
+                        && s.matches(&format!(".{}", method))
+                        // Methods written before the `define object` line have
+                        // no owner yet; trust them when they share its file.
+                        && (s.owned_by(&owner.name) || (i == home && s.owner.is_none()))
+                })
+            });
+        Some((owner.name, known))
+    }
+}
+
 impl Backend {
     /// Indentation edits for an open document, honouring the client's options.
     fn format_edits(&self, uri: &Url, options: &FormattingOptions, lines: Option<(u32, u32)>) -> Option<Vec<TextEdit>> {
         let doc = self.snapshot(uri)?;
         let tree = self.parser.parse(&doc.text)?;
         let indent = if options.insert_spaces { " ".repeat(options.tab_size.max(1) as usize) } else { "\t".to_string() };
-        Some(format::edits(&tree, &doc.text, &indent, lines))
+        let keyword_case = self.settings.lock().unwrap().keyword_case;
+        Some(format::edits(&tree, &doc.text, &format::Options { indent, keyword_case }, lines))
     }
 
     /// Copy of an open document, so no DashMap guard is held across other lookups.
@@ -613,6 +727,9 @@ impl LanguageServer for Backend {
             }
         }
         *self.roots.lock().unwrap() = roots;
+        if let Some(options) = &params.initialization_options {
+            self.settings.lock().unwrap().apply_json(options);
+        }
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -644,6 +761,7 @@ impl LanguageServer for Backend {
                     code_action_kinds: Some(vec![
                         CodeActionKind::QUICKFIX,
                         CodeActionKind::REFACTOR,
+                        CodeActionKind::SOURCE,
                         CodeActionKind::SOURCE_FIX_ALL,
                     ]),
                     ..Default::default()
@@ -730,6 +848,14 @@ impl LanguageServer for Backend {
         for change in params.changes {
             self.reindex_file(&change.uri);
         }
+        self.relint_open().await;
+    }
+
+    async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
+        self.settings.lock().unwrap().apply_json(&params.settings);
+        let settings = self.settings.lock().unwrap().clone();
+        self.client.log_message(MessageType::INFO, format!("pml-lsp: settings {:?}", settings)).await;
+        self.relint_open().await;
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
@@ -968,9 +1094,11 @@ impl LanguageServer for Backend {
                     })
                 });
                 let is_call = line.to_ascii_lowercase().contains(&format!("{}(", word.to_ascii_lowercase()));
-                let is_builtin = self.builtins.iter().any(|b| {
-                    b.is_member() && b.name.split('(').next().unwrap_or(&b.name).eq_ignore_ascii_case(word.trim_start_matches('.'))
-                });
+                let is_form = doc.symbols.owner().map(|o| o.kind == SymbolKind::Form).unwrap_or(false);
+                let is_builtin = is_universal_method(is_form, &word)
+                    || self.builtins.iter().any(|b| {
+                        b.is_member() && b.name.split('(').next().unwrap_or(&b.name).eq_ignore_ascii_case(word.trim_start_matches('.'))
+                    });
                 if is_call && !defined && !is_builtin {
                     out.push(CodeActionOrCommand::CodeAction(actions::create_method(&uri, &doc.text, &word, line, indent)));
                 }
@@ -985,10 +1113,18 @@ impl LanguageServer for Backend {
             }
         }
 
-        // Whole-file indentation fix.
+        // Whole-file formatting, then keyword case on demand (whatever the setting).
         let options = FormattingOptions { tab_size: 2, insert_spaces: true, ..Default::default() };
         if let Some(action) = self.format_edits(&uri, &options, None).and_then(|e| actions::format_document(&uri, e)) {
             out.push(CodeActionOrCommand::CodeAction(action));
+        }
+        if let Some(tree) = self.parser.parse(&doc.text) {
+            for (case, title) in [(KeywordCase::Lower, "Lowercase all keywords"), (KeywordCase::Upper, "Uppercase all keywords")] {
+                let edits = format::keyword_edits(&tree, &doc.text, case, None);
+                if let Some(action) = actions::source_action(&uri, title, CodeActionKind::SOURCE, edits) {
+                    out.push(CodeActionOrCommand::CodeAction(action));
+                }
+            }
         }
 
         Ok(Some(out))
@@ -1051,6 +1187,7 @@ async fn main() {
         roots: Mutex::new(Vec::new()),
         builtins: builtins.clone(),
         parser: Arc::new(PmlParser::new()),
+        settings: Mutex::new(Settings::default()),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
