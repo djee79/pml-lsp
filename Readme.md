@@ -36,6 +36,13 @@ A language server for AVEVA PML, built on the
   according to what defines it; `.name` as a user method, builtin method,
   gadget or member; type names as user objects or builtin types. Layered on
   top of tree-sitter highlighting through Neovim's `@lsp.type.*` groups.
+- **Formatting**: re-indents blocks (`define`, `if`, `do`, `handle`,
+  `setup form`, `frame`) from the syntax tree and strips trailing whitespace,
+  leaving everything else untouched. Continuation lines after `$` are
+  indented two levels. Works on the whole file or a range.
+- **Code actions**: create a stub for an undefined method called on the
+  current line (parameters named after `!var` arguments); add a
+  `handle any … endhandle` block after a statement; fix indentation.
 - **Find references** and **rename** across all indexed files. Matching is
   case-insensitive and namespace-aware: renaming `.scale` touches methods and
   calls, not a `!scale` variable. Local `!x` variables are renamed inside
@@ -85,8 +92,14 @@ The `pml` filetype and the tree-sitter parser are set up by the grammar repo;
 see its README.
 
 Useful commands: `gd` go to definition, `gr` references, `<leader>cr`
-rename, `K` hover, `<C-k>` signature help in insert mode, `<leader>ss`
-document symbols, `<leader>sS` workspace symbols, `:LspInfo`, `:LspLog`.
+rename, `<leader>ca` code actions, `<leader>cf` format, `K` hover, `<C-k>`
+signature help in insert mode, `<leader>ss` document symbols, `<leader>sS`
+workspace symbols, `:LspInfo`, `:LspLog`.
+
+LazyVim formats on save by default when the server supports it. Disable
+that for PML with `vim.g.autoformat = false` or per filetype with
+`vim.b.autoformat = false` in `after/ftplugin/pml.lua` if you prefer
+formatting on demand only.
 
 The project root is the folder containing `.git`. Without one, the server
 indexes the folder of each file you open.
@@ -104,6 +117,8 @@ src/signature.rs     call-site detection and signature parsing
 src/references.rs    namespace-aware occurrences for references and rename
 src/types.rs         static type inference over expression chains
 src/semantic.rs      semantic tokens
+src/format.rs        indentation from the syntax tree
+src/actions.rs       code actions
 data/builtins.json   builtin methods, functions, keywords, snippets
 ```
 
@@ -128,5 +143,5 @@ Rebuild after editing the JSON (it is embedded), or point
 
 ## Roadmap
 
-- Code actions: create a missing method stub, add a `handle` block.
-- Formatting: consistent indentation of blocks.
+- Keyword case normalisation as an optional formatting pass.
+- Unused-variable and unknown-method diagnostics.

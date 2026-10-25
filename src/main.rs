@@ -14,9 +14,12 @@
 //!   - Hover and go-to-definition for builtins and user symbols
 //!   - Signature help, find-references and rename
 //!   - Semantic tokens for functions, forms, globals, methods, gadgets, types
+//!   - Formatting (indentation) and code actions (method stub, handle block)
 
+mod actions;
 mod context;
 mod diagnostics;
+mod format;
 mod parser;
 mod references;
 mod semantic;
@@ -398,6 +401,14 @@ impl<'a> types::Env for TypeEnv<'a> {
 }
 
 impl Backend {
+    /// Indentation edits for an open document, honouring the client's options.
+    fn format_edits(&self, uri: &Url, options: &FormattingOptions, lines: Option<(u32, u32)>) -> Option<Vec<TextEdit>> {
+        let doc = self.snapshot(uri)?;
+        let tree = self.parser.parse(&doc.text)?;
+        let indent = if options.insert_spaces { " ".repeat(options.tab_size.max(1) as usize) } else { "\t".to_string() };
+        Some(format::edits(&tree, &doc.text, &indent, lines))
+    }
+
     /// Copy of an open document, so no DashMap guard is held across other lookups.
     fn snapshot(&self, uri: &Url) -> Option<Document> {
         self.documents.get(uri).map(|d| d.clone())
@@ -627,6 +638,16 @@ impl LanguageServer for Backend {
                     work_done_progress_options: Default::default(),
                 }),
                 references_provider: Some(OneOf::Left(true)),
+                document_formatting_provider: Some(OneOf::Left(true)),
+                document_range_formatting_provider: Some(OneOf::Left(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+                    code_action_kinds: Some(vec![
+                        CodeActionKind::QUICKFIX,
+                        CodeActionKind::REFACTOR,
+                        CodeActionKind::SOURCE_FIX_ALL,
+                    ]),
+                    ..Default::default()
+                })),
                 semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
                     SemanticTokensOptions {
                         legend: SemanticTokensLegend {
@@ -911,6 +932,66 @@ impl LanguageServer for Backend {
             changes: Some(changes),
             ..Default::default()
         }))
+    }
+
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        Ok(self.format_edits(&params.text_document.uri, &params.options, None))
+    }
+
+    async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let lines = (params.range.start.line, params.range.end.line);
+        Ok(self.format_edits(&params.text_document.uri, &params.options, Some(lines)))
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let Some(doc) = self.snapshot(&uri) else {
+            return Ok(None);
+        };
+        let row = params.range.start.line;
+        let Some(line) = doc.text.lines().nth(row as usize) else {
+            return Ok(None);
+        };
+        let indent = "  ";
+        let mut out: Vec<CodeActionOrCommand> = Vec::new();
+
+        // Create a stub for an undefined method called on this line.
+        if let Some((word, _)) = context::word_span_at(&doc.text, params.range.start) {
+            if word.starts_with('.') {
+                let tables = self.tables(&uri);
+                let owner = doc.symbols.owner().map(|o| o.name.clone());
+                let defined = tables.iter().any(|(_, t)| {
+                    t.iter().any(|s| {
+                        s.kind == SymbolKind::Method
+                            && s.matches(&word)
+                            && owner.as_deref().map(|o| s.owned_by(o)).unwrap_or(true)
+                    })
+                });
+                let is_call = line.to_ascii_lowercase().contains(&format!("{}(", word.to_ascii_lowercase()));
+                let is_builtin = self.builtins.iter().any(|b| {
+                    b.is_member() && b.name.split('(').next().unwrap_or(&b.name).eq_ignore_ascii_case(word.trim_start_matches('.'))
+                });
+                if is_call && !defined && !is_builtin {
+                    out.push(CodeActionOrCommand::CodeAction(actions::create_method(&uri, &doc.text, &word, line, indent)));
+                }
+            }
+        }
+
+        // Error handler after a plain statement.
+        if actions::is_handleable(line) {
+            let next = doc.text.lines().nth(row as usize + 1).map(|l| l.trim().to_ascii_lowercase());
+            if !next.map(|n| n.starts_with("handle")).unwrap_or(false) {
+                out.push(CodeActionOrCommand::CodeAction(actions::add_handle(&uri, line, row, indent)));
+            }
+        }
+
+        // Whole-file indentation fix.
+        let options = FormattingOptions { tab_size: 2, insert_spaces: true, ..Default::default() };
+        if let Some(action) = self.format_edits(&uri, &options, None).and_then(|e| actions::format_document(&uri, e)) {
+            out.push(CodeActionOrCommand::CodeAction(action));
+        }
+
+        Ok(Some(out))
     }
 
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
