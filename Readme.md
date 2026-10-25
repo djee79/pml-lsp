@@ -84,6 +84,18 @@ The grammar is fetched from GitHub. To build against a local checkout of
 `./install.sh --grammar ../tree-sitter-pml` builds both the server and the
 parser shared library and links the parser and queries into Neovim.
 
+On Windows use `.\install.ps1 -Grammar ..\tree-sitter-pml` instead. It needs
+Rust (rustup, with the Visual Studio Build Tools C++ workload) and the
+tree-sitter CLI (`npm install -g tree-sitter-cli@0.25.10`). It builds
+`pml.dll` and copies it to `%LOCALAPPDATA%\nvim-data\site\parser\` and the
+queries to `%LOCALAPPDATA%\nvim\queries\pml\`; because these are copies, not
+links, re-run it after every `git pull`. If PowerShell refuses to run the
+script, start it with
+`powershell -ExecutionPolicy Bypass -File .\install.ps1 -Grammar ..\tree-sitter-pml`.
+
+Updating an existing installation is `git pull` in both repositories
+followed by the same install command.
+
 ## Neovim (LazyVim)
 
 ```lua
