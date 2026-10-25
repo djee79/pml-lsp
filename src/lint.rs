@@ -7,7 +7,9 @@
 //! syntax error or a `$m` macro call is skipped too. Unknown-method checks
 //! only fire when the receiver's type is a user object or form whose
 //! definition is indexed; builtin types are not checked because the builtin
-//! method list is not exhaustive.
+//! method list is not exhaustive. Argument counts are compared against every
+//! definition of a user method, function or constructor, so overloads pass
+//! as long as one of them fits.
 
 use std::collections::HashSet;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, Position, Range};
@@ -21,6 +23,14 @@ pub trait Resolver {
     /// fully known, so nothing should be reported. Otherwise the type's
     /// display name and whether the method exists on it.
     fn method_defined(&self, receiver: &str, method: &str) -> Option<(String, bool)>;
+    /// Parameter counts of every user definition of `.method` on the
+    /// receiver's type. `None` when the type is unknown or the method is not
+    /// user-defined (builtin, universal, missing).
+    fn method_arities(&self, receiver: &str, method: &str) -> Option<Vec<usize>>;
+    /// Parameter counts of every definition of the user function `!!name`.
+    fn function_arities(&self, name: &str) -> Option<Vec<usize>>;
+    /// Parameter counts of the constructor methods of user object `type_name`.
+    fn constructor_arities(&self, type_name: &str) -> Option<Vec<usize>>;
 }
 
 /// `!x` assigned inside a function or method body and never read there.
@@ -77,7 +87,8 @@ fn check_scope(scope_node: Node, text: &str, out: &mut Vec<Diagnostic>) {
 /// `!name` → `Some("!name")` lowercased, for locals only (`!!g` and `$!!g`
 /// are globals; `!this` is never assigned).
 fn local_key(var: &str) -> Option<String> {
-    let v = var.trim_start_matches('$');
+    // A `variable` token right after `$P` carries its leading space.
+    let v = var.trim().trim_start_matches('$');
     if v.starts_with('!') && !v.starts_with("!!") && v.len() > 1 {
         Some(v.to_ascii_lowercase())
     } else {
@@ -182,6 +193,97 @@ pub fn unknown_methods(tree: &Tree, text: &str, resolver: &dyn Resolver) -> Vec<
     out
 }
 
+/// Calls whose argument count matches none of the callee's definitions.
+pub fn argument_counts(tree: &Tree, text: &str, resolver: &dyn Resolver) -> Vec<Diagnostic> {
+    let src = text.as_bytes();
+    let lines: Vec<&str> = text.lines().collect();
+    let mut out = Vec::new();
+    let mut stack = vec![tree.root_node()];
+    while let Some(node) = stack.pop() {
+        if !node.has_error() {
+            let text_of = |n: Node| n.utf8_text(src).unwrap_or("").to_string();
+            let checked: Option<(String, Vec<usize>, Node)> = match node.kind() {
+                "method_call" => match (node.child_by_field_name("object"), node.child_by_field_name("method"), args_of(node)) {
+                    (Some(obj), Some(m), Some(args)) => {
+                        resolver.method_arities(&text_of(obj), &text_of(m)).map(|a| (format!(".{}()", text_of(m)), a, args))
+                    }
+                    _ => None,
+                },
+                "function_call" => match (node.child_by_field_name("function"), args_of(node)) {
+                    (Some(f), Some(args)) if f.kind() == "variable" && text_of(f).starts_with("!!") => {
+                        resolver.function_arities(&text_of(f)).map(|a| (format!("{}()", text_of(f)), a, args))
+                    }
+                    _ => None,
+                },
+                "object_expression" => match (node.child_by_field_name("type"), args_of(node)) {
+                    // `object T()` always works even when T has only
+                    // constructors with arguments, so an empty list is fine.
+                    (Some(t), Some(args)) if argument_count(args) > 0 => {
+                        resolver.constructor_arities(&text_of(t)).map(|a| (format!("object {}()", text_of(t)), a, args))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some((callee, arities, args)) = checked {
+                let given = argument_count(args);
+                if !arities.is_empty() && !arities.contains(&given) {
+                    out.push(Diagnostic {
+                        range: node_range(args, &lines),
+                        severity: Some(DiagnosticSeverity::WARNING),
+                        source: Some("pml-lsp".to_string()),
+                        message: format!("`{}` takes {}, but {} given", callee, describe_arities(&arities), describe_given(given)),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+        let mut cursor = node.walk();
+        for child in node.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    out.sort_by_key(|d| (d.range.start.line, d.range.start.character));
+    out
+}
+
+fn args_of<'a>(call: Node<'a>) -> Option<Node<'a>> {
+    let mut cursor = call.walk();
+    let found = call.children(&mut cursor).find(|c| c.kind() == "argument_list");
+    found
+}
+
+fn argument_count(argument_list: Node) -> usize {
+    let mut cursor = argument_list.walk();
+    argument_list.named_children(&mut cursor).filter(|c| c.kind() == "expression").count()
+}
+
+fn describe_arities(arities: &[usize]) -> String {
+    let mut sorted: Vec<usize> = arities.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let plural = |n: usize| if n == 1 { "argument" } else { "arguments" };
+    match sorted.as_slice() {
+        [0] => "no arguments".to_string(),
+        [n] => format!("{} {}", n, plural(*n)),
+        [rest @ .., last] => format!(
+            "{} or {} {}",
+            rest.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(", "),
+            last,
+            plural(*last)
+        ),
+        [] => "no arguments".to_string(),
+    }
+}
+
+fn describe_given(given: usize) -> String {
+    match given {
+        0 => "none".to_string(),
+        1 => "1 was".to_string(),
+        n => format!("{} were", n),
+    }
+}
+
 fn node_range(node: Node, lines: &[&str]) -> Range {
     let (s, e) = (node.start_position(), node.end_position());
     let col = |row: usize, byte: usize| lines.get(row).map(|l| char_col(l, byte)).unwrap_or(byte) as u32;
@@ -214,7 +316,7 @@ mod tests {
 
     #[test]
     fn reads_in_strings_output_commands_and_calls_count() {
-        let src = "define method .m()\n  !a = 1\n  !b = 2\n  !c = 3\n  !d = ARRAY()\n  !e = 7\n  !f = 1\n  $P value $!a\n  !!f.text.val = |n=$!b|\n  q var !c\n  !d.append(1)\n  !e[1] = 2\n  !!f.cb.callback = '!f.go()'\nendmethod\n";
+        let src = "define method .m()\n  !a = 1\n  !b = 2\n  !c = 3\n  !d = ARRAY()\n  !e = 7\n  !f = 1\n  !g = 1\n  $P value $!a\n  $P $!g\n  !!f.text.val = |n=$!b|\n  q var !c\n  !d.append(1)\n  !e[1] = 2\n  !!f.cb.callback = '!f.go()'\nendmethod\n";
         assert!(unused(src).is_empty());
     }
 
@@ -244,6 +346,40 @@ mod tests {
                 _ => None,
             }
         }
+        fn method_arities(&self, receiver: &str, method: &str) -> Option<Vec<usize>> {
+            match (receiver.to_ascii_lowercase().as_str(), method.to_ascii_lowercase().as_str()) {
+                ("!this", "ok") => Some(vec![0]),
+                ("!box", "volume") => Some(vec![1, 2]),
+                ("!box", "show") => None, // builtin: arity unknown
+                _ => None,
+            }
+        }
+        fn function_arities(&self, name: &str) -> Option<Vec<usize>> {
+            name.eq_ignore_ascii_case("!!area").then(|| vec![2])
+        }
+        fn constructor_arities(&self, type_name: &str) -> Option<Vec<usize>> {
+            type_name.eq_ignore_ascii_case("box").then(|| vec![1])
+        }
+    }
+
+    #[test]
+    fn reports_argument_count_mismatches() {
+        let src = "define method .m()\n  !this.ok()\n  !this.ok(1)\n  !box.volume(1)\n  !box.volume(1, 2)\n  !box.volume()\n  !box.show(1, 2, 3)\n  !a = !!Area(1, 2)\n  !b = !!Area(!x.y(1), $\n    2, 3)\n  !c = !!Unknown(1)\n  !d = object BOX()\n  !e = object BOX(1)\n  !f = object BOX(1, 2)\n  !g = object STRING(1)\nendmethod\n";
+        let parser = PmlParser::new();
+        let tree = parser.parse(src).unwrap();
+        let d = argument_counts(&tree, src, &Fake);
+        let got: Vec<(u32, String)> = d.iter().map(|x| (x.range.start.line, x.message.clone())).collect();
+        assert_eq!(
+            got,
+            vec![
+                (2, "`.ok()` takes no arguments, but 1 was given".to_string()),
+                (5, "`.volume()` takes 1 or 2 arguments, but none given".to_string()),
+                (8, "`!!Area()` takes 2 arguments, but 3 were given".to_string()),
+                (13, "`object BOX()` takes 1 argument, but 2 were given".to_string()),
+            ]
+        );
+        // The range covers the argument list, including the continuation.
+        assert_eq!((d[2].range.start.character, d[2].range.end.line), (13, 9));
     }
 
     #[test]

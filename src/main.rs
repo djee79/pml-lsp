@@ -177,11 +177,12 @@ struct Settings {
     keyword_case: KeywordCase,
     unused_variables: bool,
     unknown_methods: bool,
+    argument_counts: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { keyword_case: KeywordCase::Keep, unused_variables: true, unknown_methods: true }
+        Settings { keyword_case: KeywordCase::Keep, unused_variables: true, unknown_methods: true, argument_counts: true }
     }
 }
 
@@ -198,6 +199,9 @@ impl Settings {
         }
         if let Some(b) = value.get("unknownMethods").and_then(|v| v.as_bool()) {
             self.unknown_methods = b;
+        }
+        if let Some(b) = value.get("argumentCounts").and_then(|v| v.as_bool()) {
+            self.argument_counts = b;
         }
     }
 }
@@ -254,10 +258,15 @@ impl Backend {
         if settings.unused_variables {
             diags.extend(lint::unused_variables(tree, text));
         }
-        if settings.unknown_methods {
+        if settings.unknown_methods || settings.argument_counts {
             let tables = self.tables(uri);
             let env = TypeEnv { tables: &tables, builtins: &self.builtins, text, symbols };
-            diags.extend(lint::unknown_methods(tree, text, &env));
+            if settings.unknown_methods {
+                diags.extend(lint::unknown_methods(tree, text, &env));
+            }
+            if settings.argument_counts {
+                diags.extend(lint::argument_counts(tree, text, &env));
+            }
         }
         diags
     }
@@ -484,32 +493,77 @@ fn is_universal_method(owner_is_form: bool, method: &str) -> bool {
     UNIVERSAL_METHODS.contains(&lc.as_str()) || (owner_is_form && FORM_METHODS.contains(&lc.as_str()))
 }
 
+impl<'a> TypeEnv<'a> {
+    /// The user object or form named `type_name`, with the index of the table
+    /// (file) that defines it.
+    fn user_owner(&self, type_name: &str) -> Option<(usize, Symbol)> {
+        self.tables.iter().enumerate().find_map(|(i, (_, t))| {
+            t.iter()
+                .find(|s| matches!(s.kind, SymbolKind::Object | SymbolKind::Form) && s.matches(type_name))
+                .cloned()
+                .map(|s| (i, s))
+        })
+    }
+
+    /// Every user definition of `.method` on `owner`. Methods written before
+    /// the `define object` line have no owner yet; trust them when they share
+    /// its file (`home`).
+    fn user_methods(&self, home: usize, owner: &Symbol, method: &str) -> Vec<Symbol> {
+        let dotted = format!(".{}", method.trim_start_matches('.'));
+        self.tables
+            .iter()
+            .enumerate()
+            .flat_map(|(i, (_, t))| {
+                t.iter()
+                    .filter(|s| s.kind == SymbolKind::Method && s.matches(&dotted) && (s.owned_by(&owner.name) || (i == home && s.owner.is_none())))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+}
+
+fn arities(defs: &[Symbol]) -> Option<Vec<usize>> {
+    let counts: Vec<usize> = defs.iter().filter_map(|s| signature::parameter_count(&s.detail)).collect();
+    (!counts.is_empty()).then_some(counts)
+}
+
 impl<'a> lint::Resolver for TypeEnv<'a> {
     /// Only user objects and forms are checked: their methods are all in the
     /// indexed definitions. Builtin receivers return `None` because
     /// builtins.json is not an exhaustive method list.
     fn method_defined(&self, receiver: &str, method: &str) -> Option<(String, bool)> {
         let type_name = types::infer(receiver, self)?;
-        let (home, owner) = self.tables.iter().enumerate().find_map(|(i, (_, t))| {
-            t.iter()
-                .find(|s| matches!(s.kind, SymbolKind::Object | SymbolKind::Form) && s.matches(&type_name))
-                .cloned()
-                .map(|s| (i, s))
-        })?;
+        let (home, owner) = self.user_owner(&type_name)?;
         let is_form = owner.kind == SymbolKind::Form;
         let builtin_name = |b: &Builtin| b.name.split('(').next().unwrap_or(&b.name).eq_ignore_ascii_case(method);
         let known = is_universal_method(is_form, method)
             || (is_form && self.builtins.iter().any(|b| b.is_member() && b.applies_to(Some("FORM")) && builtin_name(b)))
-            || self.tables.iter().enumerate().any(|(i, (_, t))| {
-                t.iter().any(|s| {
-                    s.kind == SymbolKind::Method
-                        && s.matches(&format!(".{}", method))
-                        // Methods written before the `define object` line have
-                        // no owner yet; trust them when they share its file.
-                        && (s.owned_by(&owner.name) || (i == home && s.owner.is_none()))
-                })
-            });
+            || !self.user_methods(home, &owner, method).is_empty();
         Some((owner.name, known))
+    }
+
+    fn method_arities(&self, receiver: &str, method: &str) -> Option<Vec<usize>> {
+        let type_name = types::infer(receiver, self)?;
+        let (home, owner) = self.user_owner(&type_name)?;
+        arities(&self.user_methods(home, &owner, method))
+    }
+
+    fn function_arities(&self, name: &str) -> Option<Vec<usize>> {
+        let defs: Vec<Symbol> = self
+            .tables
+            .iter()
+            .flat_map(|(_, t)| t.iter().filter(|s| s.kind == SymbolKind::Function && s.matches(name)).cloned().collect::<Vec<_>>())
+            .collect();
+        arities(&defs)
+    }
+
+    fn constructor_arities(&self, type_name: &str) -> Option<Vec<usize>> {
+        let (home, owner) = self.user_owner(type_name)?;
+        if owner.kind != SymbolKind::Object {
+            return None;
+        }
+        arities(&self.user_methods(home, &owner, &owner.name))
     }
 }
 

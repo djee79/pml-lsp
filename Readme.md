@@ -18,7 +18,11 @@ A language server for AVEVA PML, built on the
   - a `.method()` call on a user object or form that defines no such method,
     e.g. `!this.reszie()` in a form file or `!b.area()` after
     `!b = object BOX()`. Builtin types are not checked because the builtin
-    list is not exhaustive.
+    list is not exhaustive;
+  - a call to a user method, `!!function` or `object T(...)` constructor
+    whose argument count matches none of its definitions, e.g.
+    `!!Area(1, 2, 3)` against `define function !!Area(!l is REAL, !w is REAL)`.
+    Overloads pass when any definition fits; `object T()` is always accepted.
 - **Completion**, aware of what you are typing:
   - after `.`: the receiver is resolved when possible and only its members
     are offered: `!this.` gives the current object's or form's methods,
@@ -131,6 +135,7 @@ pml_ls = {
       keywordCase = "lower",     -- "keep" (default), "lower" or "upper"
       unusedVariables = true,    -- default true
       unknownMethods = true,     -- default true
+      argumentCounts = true,     -- default true
     },
   },
 },
@@ -177,5 +182,5 @@ Rebuild after editing the JSON (it is embedded), or point
 
 ## Roadmap
 
-- Argument-count checks against the signature of user methods and functions.
-- Unknown-method checks on builtin types once `builtins.json` is complete.
+- Unknown-method and argument-count checks on builtin types once
+  `builtins.json` is complete.

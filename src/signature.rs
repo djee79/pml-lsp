@@ -135,6 +135,27 @@ pub fn signature_from_detail(detail: &str, documentation: &str) -> SignatureInfo
     }
 }
 
+/// Number of parameters in a definition's detail string, e.g. 2 for
+/// `define method .m(!a is REAL, !b is STRING) is REAL`. `None` when the
+/// detail has no parameter list.
+pub fn parameter_count(detail: &str) -> Option<usize> {
+    let open = detail.find('(')?;
+    let mut depth = 0;
+    let mut count = 0;
+    let mut saw_content = false;
+    for c in detail[open + 1..].chars() {
+        match c {
+            '(' => depth += 1,
+            ')' if depth == 0 => return Some(if saw_content { count + 1 } else { 0 }),
+            ')' => depth -= 1,
+            ',' if depth == 0 => count += 1,
+            c if !c.is_whitespace() => saw_content = true,
+            _ => {}
+        }
+    }
+    None
+}
+
 fn push_param(out: &mut Vec<ParameterInformation>, label: &str, mut start: usize, mut end: usize) {
     let trim = |b: u8| matches!(b, b' ' | b'[' | b']');
     while start < end && trim(label.as_bytes()[start]) {
@@ -184,6 +205,14 @@ mod tests {
     fn follows_line_continuation() {
         let text = "!x = !!Area(1, $\n          ";
         assert_eq!(call_at(text, Position::new(1, 10)), Some(CallSite { callee: "!!Area".into(), active_parameter: 1 }));
+    }
+
+    #[test]
+    fn counts_parameters() {
+        assert_eq!(parameter_count("define method .m() is REAL"), Some(0));
+        assert_eq!(parameter_count("define method .m(!a is REAL)"), Some(1));
+        assert_eq!(parameter_count("define function !!f(!a is REAL, !b is ARRAY) is BOOLEAN"), Some(2));
+        assert_eq!(parameter_count("!!x"), None);
     }
 
     #[test]
