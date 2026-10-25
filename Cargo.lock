@@ -863,7 +863,7 @@ checksum = "d0af592be68c579aa78a16846bd19422978c3c52e438523d45ff5d1bff1f9d4a"
 [[package]]
 name = "tree-sitter-pml"
 version = "0.1.0"
-source = "git+https://github.com/djee79/tree-sitter-pml.git?branch=main#f290e48c02d8ba5c288e477f2e1f707f19d5dd3f"
+source = "git+https://github.com/djee79/tree-sitter-pml.git?branch=main#1ea5b91368197969a291cfc87c2a83dbf2dc46fe"
 dependencies = [
  "cc",
  "tree-sitter-language",

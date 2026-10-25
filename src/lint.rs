@@ -87,7 +87,8 @@ fn check_scope(scope_node: Node, text: &str, out: &mut Vec<Diagnostic>) {
 /// `!name` → `Some("!name")` lowercased, for locals only (`!!g` and `$!!g`
 /// are globals; `!this` is never assigned).
 fn local_key(var: &str) -> Option<String> {
-    // A `variable` token right after `$P` carries its leading space.
+    // Defensive: grammars before 1ea5b91 gave a `variable` right after `$P`
+    // its leading space.
     let v = var.trim().trim_start_matches('$');
     if v.starts_with('!') && !v.starts_with("!!") && v.len() > 1 {
         Some(v.to_ascii_lowercase())
