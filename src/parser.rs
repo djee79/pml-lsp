@@ -15,8 +15,8 @@ impl PmlParser {
     pub fn new() -> Self {
         let mut parser = Parser::new();
         parser
-            .set_language(&tree_sitter_aveva_pml_parser::LANGUAGE.into())
-            .expect("failed to load PML grammar — check tree-sitter-aveva-pml-parser binding build");
+            .set_language(&tree_sitter_pml::LANGUAGE.into())
+            .expect("failed to load PML grammar — check the tree-sitter-pml crate build");
         Self {
             inner: Mutex::new(parser),
         }

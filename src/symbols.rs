@@ -1,36 +1,88 @@
 //! Symbol extraction from a parsed PML document.
 //!
-//! Walks the tree-sitter parse tree and collects every user-defined symbol —
-//! functions, methods, objects, members, parameters, and top-level variable
-//! assignments — into a `SymbolTable`. The node names referenced here come
-//! directly from your grammar (verified against `:InspectTree` output and
-//! the existing `locals.scm`).
+//! Walks the tree-sitter parse tree and collects every user-defined symbol:
+//! functions, methods, objects and their members, forms and their gadgets,
+//! and global variable assignments. Node kinds and field names come from the
+//! `tree-sitter-pml` grammar (`src/node-types.json` in that repo).
 
+use tower_lsp::lsp_types::{Position, Range};
 use tree_sitter::{Node, Tree};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SymbolKind {
     Function,
     Method,
     Object,
     Member,
-    Parameter,
+    Form,
+    Gadget,
     Variable,
 }
 
 #[derive(Clone, Debug)]
 pub struct Symbol {
+    /// Name as the user writes it: `!!Area`, `.Show` (methods and members
+    /// keep their leading dot), `MYOBJECT`, `!!myForm`.
     pub name: String,
     pub kind: SymbolKind,
-    /// Short type signature shown next to the name in the completion menu
-    /// (e.g., `"!!Area(!Length is REAL, !Width is REAL) is REAL"`).
+    /// Short signature shown next to the name in the completion menu
+    /// (e.g. `define function !!Area(!Length is REAL) is REAL`).
     pub detail: String,
-    /// Markdown documentation. For user code this is normally extracted
-    /// from a leading comment block, or a synthesized signature note if
-    /// no comment is present.
+    /// Markdown documentation: the leading `--` comment block if present,
+    /// otherwise a synthesized note.
     pub documentation: String,
-    /// 0-indexed start row in the source — used later for go-to-definition.
-    pub start_line: usize,
+    /// Full extent of the definition.
+    pub range: Range,
+    /// Extent of the name token, used for go-to-definition.
+    pub selection_range: Range,
+    /// Members of an object, gadgets of a form.
+    pub children: Vec<Symbol>,
+    /// For methods, members and gadgets: the object or form they belong to
+    /// (`BOX`, `!!myForm`). Methods in a `.pmlobj`/`.pmlfrm` file belong to
+    /// the object or form defined earlier in the same file.
+    pub owner: Option<String>,
+}
+
+impl Symbol {
+    /// Name without the `.`/`!`/`!!`/`$` prefix, for loose matching.
+    pub fn bare_name(&self) -> &str {
+        self.name.trim_start_matches(['!', '.', '$'])
+    }
+
+    /// True when `word` (as typed under the cursor) refers to this symbol.
+    /// The prefix decides the namespace: `!!x` only matches globals and
+    /// functions, `!x` locals, `.x` methods/members/gadgets, and a bare word
+    /// only unprefixed names (objects).
+    pub fn matches(&self, word: &str) -> bool {
+        let word = word.trim_start_matches('$');
+        let w = word.trim_start_matches(['!', '.']);
+        if w.is_empty() || !self.bare_name().eq_ignore_ascii_case(w) {
+            return false;
+        }
+        let prefix_of = |s: &str| -> String { s.chars().take_while(|c| matches!(c, '!' | '.')).collect() };
+        prefix_of(word) == prefix_of(&self.name)
+    }
+
+    /// True when this symbol belongs to `owner` (object or form name).
+    pub fn owned_by(&self, owner: &str) -> bool {
+        self.owner
+            .as_deref()
+            .map(|o| o.trim_start_matches('!').eq_ignore_ascii_case(owner.trim_start_matches('!')))
+            .unwrap_or(false)
+    }
+
+    /// Uppercase type for gadgets (`BUTTON`), members (`REAL`), forms (`FORM`).
+    pub fn type_name(&self) -> Option<String> {
+        match self.kind {
+            SymbolKind::Form => Some("FORM".to_string()),
+            SymbolKind::Gadget | SymbolKind::Member => self
+                .detail
+                .rsplit(" is ")
+                .next()
+                .map(|t| t.trim().to_ascii_uppercase()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -42,47 +94,80 @@ impl SymbolTable {
     /// Build a SymbolTable from a parsed tree and the original source text.
     pub fn extract(tree: &Tree, source: &str) -> Self {
         let mut table = SymbolTable::default();
-        let root = tree.root_node();
-        let bytes = source.as_bytes();
-        walk(root, bytes, &mut table);
+        let mut owner = None;
+        walk(tree.root_node(), source.as_bytes(), &mut table.symbols, &mut owner);
         table
+    }
+
+    /// The object or form this file defines, if any.
+    pub fn owner(&self) -> Option<&Symbol> {
+        self.symbols
+            .iter()
+            .find(|s| matches!(s.kind, SymbolKind::Object | SymbolKind::Form))
+    }
+
+    /// Every symbol, including children, depth first.
+    pub fn iter(&self) -> impl Iterator<Item = &Symbol> {
+        fn push<'a>(out: &mut Vec<&'a Symbol>, syms: &'a [Symbol]) {
+            for s in syms {
+                out.push(s);
+                push(out, &s.children);
+            }
+        }
+        let mut all = Vec::new();
+        push(&mut all, &self.symbols);
+        all.into_iter()
+    }
+
+    /// First symbol whose name matches `word`.
+    pub fn find(&self, word: &str) -> Option<&Symbol> {
+        self.iter().find(|s| s.matches(word))
     }
 }
 
-fn walk(node: Node, src: &[u8], out: &mut SymbolTable) {
+/// Gadget commands that define a `.name` inside a form.
+const GADGET_KINDS: &[&str] = &[
+    "button", "text", "toggle", "option", "paragraph", "list", "textpane", "slider",
+    "rgroup", "combo", "numeric", "line", "selector", "database", "frame", "view",
+    "menu", "bar", "tabset", "panel", "container",
+];
+
+fn walk(node: Node, src: &[u8], out: &mut Vec<Symbol>, owner: &mut Option<String>) {
     match node.kind() {
         "function_definition" => {
-            extract_function(node, src, out);
-            // Don't recurse into the function body — its parameters and locals
-            // aren't useful as global completions and would add noise.
+            out.extend(extract_function(node, src));
             return;
         }
         "method_definition" => {
-            extract_method(node, src, out);
+            out.extend(extract_method(node, src).map(|mut m| {
+                m.owner = owner.clone();
+                m
+            }));
             return;
         }
         "object_definition" => {
-            extract_object(node, src, out);
-            // Recurse so member_definition children get picked up.
-        }
-        "member_definition" => {
-            extract_member(node, src, out);
+            if let Some(obj) = extract_object(node, src) {
+                *owner = Some(obj.name.clone());
+                out.push(obj);
+            }
             return;
         }
-        "assignment" => {
-            // Top-level assignments (e.g., `!!myGlobal = 'foo'`) are useful
-            // as completion items. Local !x = 1 inside functions is filtered
-            // out because we already returned above before descending into
-            // function/method bodies.
-            extract_assignment(node, src, out);
+        "form_definition" => {
+            if let Some(form) = extract_form(node, src) {
+                *owner = Some(form.name.clone());
+                out.push(form);
+            }
+            return;
         }
+        // Only global variables (`!!name = ...`, `var !!name ...`) are offered.
+        "assignment" => out.extend(extract_global(node, src, "left")),
+        "var_statement" => out.extend(extract_global(node, src, "variable")),
         _ => {}
     }
 
-    // Default: recurse into children
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
-        walk(child, src, out);
+        walk(child, src, out, owner);
     }
 }
 
@@ -90,233 +175,327 @@ fn node_text(node: Node, src: &[u8]) -> String {
     node.utf8_text(src).unwrap_or("").to_string()
 }
 
-/// Find a child by node-kind name.
+fn to_position(p: tree_sitter::Point) -> Position {
+    Position::new(p.row as u32, p.column as u32)
+}
+
+fn node_range(node: Node) -> Range {
+    Range::new(to_position(node.start_position()), to_position(node.end_position()))
+}
+
 fn child_by_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
-        if child.kind() == kind {
-            return Some(child);
-        }
-    }
-    None
+    let found = node.named_children(&mut cursor).find(|c| c.kind() == kind);
+    found
 }
 
-/// Collect text of all named children matching one of the given kinds.
-fn collect_children<'a>(node: Node<'a>, kinds: &[&str]) -> Vec<Node<'a>> {
-    let mut out = Vec::new();
+fn children_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
     let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
-        if kinds.contains(&child.kind()) {
-            out.push(child);
-        }
-    }
-    out
+    node.named_children(&mut cursor)
+        .filter(|c| c.kind() == kind)
+        .collect()
 }
 
-/// Extract leading `--` comment lines immediately above the node.
-/// Returns the joined text or empty string if none found.
+/// Leading `--` / `$*` comment lines directly above the node, joined.
 fn leading_comment(node: Node, src: &[u8]) -> String {
-    // tree-sitter doesn't track preceding comments by default; we reach
-    // backward through previous siblings looking for `comment` nodes.
     let mut comments: Vec<String> = Vec::new();
     let mut current = node.prev_named_sibling();
-    let node_row = node.start_position().row;
+    let mut next_row = node.start_position().row;
     while let Some(sib) = current {
-        // Only accept comments immediately above (within ~2 lines of the def).
-        if sib.end_position().row + 2 < node_row {
+        if sib.kind() != "comment" || sib.end_position().row + 1 < next_row {
             break;
         }
-        if sib.kind() == "comment" {
-            let text = node_text(sib, src);
-            // Strip leading `--` and surrounding whitespace
-            let cleaned = text
-                .trim_start_matches('-')
-                .trim_start_matches('-')
-                .trim()
-                .to_string();
-            comments.push(cleaned);
-            current = sib.prev_named_sibling();
-        } else {
-            break;
-        }
+        let text = node_text(sib, src);
+        let cleaned = text
+            .trim_start_matches("--")
+            .trim_start_matches("$*")
+            .trim()
+            .to_string();
+        comments.push(cleaned);
+        next_row = sib.start_position().row;
+        current = sib.prev_named_sibling();
     }
     comments.reverse();
     comments.join("\n")
 }
 
-fn extract_function(node: Node, src: &[u8], out: &mut SymbolTable) {
-    // Grammar: function_definition has a `name: macro_function` child plus
-    // an optional `parameter_list` and an `is_clause` for the return type.
-    let Some(name_node) = node.child_by_field_name("name").or_else(|| child_by_kind(node, "macro_function")) else {
-        return;
-    };
+fn with_comment(comment: &str, fallback: &str, detail: &str) -> String {
+    let intro = if comment.is_empty() { fallback } else { comment };
+    format!("{}\n\n```pml\n{}\n```", intro, detail)
+}
+
+fn extract_function(node: Node, src: &[u8]) -> Option<Symbol> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| child_by_kind(node, "macro_function"))?;
     let name = node_text(name_node, src);
-
-    let params = format_params(node, src);
-    let return_type = format_return_type(node, src);
-    let detail = format!("{}({}){}", name, params, return_type);
-
-    let comment = leading_comment(node, src);
-    let documentation = if comment.is_empty() {
-        format!("**User-defined function** in this file.\n\n```pml\n{}\n```", detail)
-    } else {
-        format!("{}\n\n```pml\n{}\n```", comment, detail)
-    };
-
-    out.symbols.push(Symbol {
+    let detail = format!(
+        "define function {}({}){}",
+        name,
+        format_params(node, src),
+        format_return_type(node, src)
+    );
+    Some(Symbol {
+        documentation: with_comment(
+            &leading_comment(node, src),
+            "**User-defined function** in this file.",
+            &detail,
+        ),
         name,
         kind: SymbolKind::Function,
         detail,
-        documentation,
-        start_line: node.start_position().row,
-    });
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children: Vec::new(),
+        owner: None,
+    })
 }
 
-fn extract_method(node: Node, src: &[u8], out: &mut SymbolTable) {
-    // method_identifier holds the `.Name` form
-    let Some(name_node) = child_by_kind(node, "method_identifier") else {
-        return;
-    };
-    let name = node_text(name_node, src).trim_start_matches('.').to_string();
-
-    let params = format_params(node, src);
-    let return_type = format_return_type(node, src);
-    let detail = format!(".{}({}){}", name, params, return_type);
-
-    let comment = leading_comment(node, src);
-    let documentation = if comment.is_empty() {
-        format!("**User-defined method**.\n\n```pml\n{}\n```", detail)
-    } else {
-        format!("{}\n\n```pml\n{}\n```", comment, detail)
-    };
-
-    out.symbols.push(Symbol {
+fn extract_method(node: Node, src: &[u8]) -> Option<Symbol> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| child_by_kind(node, "method_identifier"))?;
+    let name = node_text(name_node, src);
+    let detail = format!(
+        "define method {}({}){}",
+        name,
+        format_params(node, src),
+        format_return_type(node, src)
+    );
+    Some(Symbol {
+        documentation: with_comment(
+            &leading_comment(node, src),
+            "**User-defined method** in this file.",
+            &detail,
+        ),
         name,
         kind: SymbolKind::Method,
         detail,
-        documentation,
-        start_line: node.start_position().row,
-    });
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children: Vec::new(),
+        owner: None,
+    })
 }
 
-fn extract_object(node: Node, src: &[u8], out: &mut SymbolTable) {
-    let Some(name_node) = child_by_kind(node, "identifier") else {
-        return;
-    };
+fn extract_member(node: Node, src: &[u8]) -> Option<Symbol> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| child_by_kind(node, "member_name"))?;
     let name = node_text(name_node, src);
+    let type_str = node
+        .child_by_field_name("type")
+        .or_else(|| child_by_kind(node, "type_identifier"))
+        .map(|n| node_text(n, src))
+        .unwrap_or_else(|| "ANY".to_string());
+    let detail = format!("member {} is {}", name, type_str);
+    Some(Symbol {
+        documentation: format!("**Object member.**\n\n```pml\n{}\n```", detail),
+        name,
+        kind: SymbolKind::Member,
+        detail,
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children: Vec::new(),
+        owner: None,
+    })
+}
 
-    let members: Vec<String> = collect_children(node, &["member_definition"])
-        .iter()
-        .filter_map(|m| {
-            let mname = child_by_kind(*m, "member_name").map(|n| node_text(n, src))?;
-            let mtype = child_by_kind(*m, "type_identifier").map(|n| node_text(n, src))
-                .unwrap_or_else(|| "ANY".to_string());
-            Some(format!(".{} is {}", mname, mtype))
+fn extract_object(node: Node, src: &[u8]) -> Option<Symbol> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| child_by_kind(node, "identifier"))?;
+    let name = node_text(name_node, src);
+    let children: Vec<Symbol> = children_by_kind(node, "member_definition")
+        .into_iter()
+        .filter_map(|m| extract_member(m, src))
+        .map(|mut m| {
+            m.owner = Some(name.clone());
+            m
         })
         .collect();
 
-    let detail = format!("define object {} ({} members)", name, members.len());
+    let detail = format!("define object {}", name);
     let comment = leading_comment(node, src);
-
-    let mut doc_parts = Vec::new();
-    if !comment.is_empty() {
-        doc_parts.push(comment);
+    let mut doc = vec![if comment.is_empty() {
+        "**User-defined object type.**".to_string()
+    } else {
+        comment
+    }];
+    if !children.is_empty() {
+        doc.push("**Members:**".to_string());
+        doc.push(
+            children
+                .iter()
+                .map(|c| format!("- `{}`", c.detail.trim_start_matches("member ")))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
     }
-    doc_parts.push("**User-defined object type.**".to_string());
-    if !members.is_empty() {
-        doc_parts.push("**Members:**".to_string());
-        for m in &members {
-            doc_parts.push(format!("- `{}`", m));
-        }
-    }
 
-    out.symbols.push(Symbol {
+    Some(Symbol {
         name,
         kind: SymbolKind::Object,
         detail,
-        documentation: doc_parts.join("\n\n"),
-        start_line: node.start_position().row,
-    });
+        documentation: doc.join("\n\n"),
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children,
+        owner: None,
+    })
 }
 
-fn extract_member(node: Node, src: &[u8], out: &mut SymbolTable) {
-    let Some(name_node) = child_by_kind(node, "member_name") else {
-        return;
-    };
+fn extract_form(node: Node, src: &[u8]) -> Option<Symbol> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| child_by_kind(node, "variable"))?;
     let name = node_text(name_node, src);
-    let type_str = child_by_kind(node, "type_identifier")
-        .map(|n| node_text(n, src))
-        .unwrap_or_else(|| "ANY".to_string());
 
-    let detail = format!(".{} is {}", name, type_str);
-    out.symbols.push(Symbol {
-        name,
-        kind: SymbolKind::Member,
-        detail: detail.clone(),
-        documentation: format!("**Object member field.**\n\n```pml\nmember {}\n```", detail),
-        start_line: node.start_position().row,
-    });
-}
-
-fn extract_assignment(node: Node, src: &[u8], out: &mut SymbolTable) {
-    // Only capture assignments to GLOBAL variables (!!something).
-    // Skip simple !local assignments to keep the namespace clean.
-    let Some(var_node) = child_by_kind(node, "variable") else {
-        return;
-    };
-    let name = node_text(var_node, src);
-    if !name.starts_with("!!") {
-        return;
+    let mut children = Vec::new();
+    collect_gadgets(node, src, &mut children);
+    for c in &mut children {
+        c.owner = Some(name.clone());
     }
 
-    let detail = format!("{} (global variable)", name);
-    out.symbols.push(Symbol {
+    let detail = format!("setup form {}", name);
+    let comment = leading_comment(node, src);
+    let mut doc = vec![if comment.is_empty() {
+        "**Form definition.**".to_string()
+    } else {
+        comment
+    }];
+    if !children.is_empty() {
+        doc.push("**Gadgets and members:**".to_string());
+        doc.push(
+            children
+                .iter()
+                .map(|c| format!("- `{}`", c.detail))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+
+    Some(Symbol {
         name,
-        kind: SymbolKind::Variable,
-        detail: detail.clone(),
-        documentation: format!("**Global variable** assigned in this file.\n\n```pml\n{}\n```", detail),
-        start_line: node.start_position().row,
-    });
+        kind: SymbolKind::Form,
+        detail,
+        documentation: doc.join("\n\n"),
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children,
+        owner: None,
+    })
 }
 
-/// Build a comma-separated parameter list like "!a is REAL, !b is STRING".
-fn format_params(def_node: Node, src: &[u8]) -> String {
-    let Some(plist) = child_by_kind(def_node, "parameter_list") else {
-        return String::new();
-    };
-    let params: Vec<String> = collect_children(plist, &["parameter"])
-        .iter()
-        .map(|p| {
-            let pname = child_by_kind(*p, "variable").map(|n| node_text(n, src))
-                .unwrap_or_else(|| "?".to_string());
-            let ptype = child_by_kind(*p, "type_identifier").map(|n| node_text(n, src))
-                .unwrap_or_else(|| "ANY".to_string());
-            format!("{} is {}", pname, ptype)
-        })
-        .collect();
-    params.join(", ")
-}
-
-/// Returns the return-type clause " is RETURNTYPE" or empty string.
-/// Grammar pattern: after the parameter_list, a `keyword_is` followed by
-/// an `identifier` or `type_identifier`.
-fn format_return_type(def_node: Node, src: &[u8]) -> String {
-    // Look for a `keyword_is` that is NOT inside a parameter_list, followed
-    // by an identifier/type_identifier.
-    let mut cursor = def_node.walk();
-    let mut saw_keyword_is = false;
-    let mut saw_param_list = false;
-    for child in def_node.named_children(&mut cursor) {
+/// Collect `member .x is TYPE` lines and gadget definitions (`button .ok ...`,
+/// `frame .fr ...`) anywhere inside a form body, including nested frames.
+fn collect_gadgets(node: Node, src: &[u8], out: &mut Vec<Symbol>) {
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
         match child.kind() {
-            "parameter_list" => saw_param_list = true,
-            "keyword_is" if saw_param_list => saw_keyword_is = true,
-            "identifier" | "type_identifier" if saw_keyword_is => {
-                return format!(" is {}", node_text(child, src));
+            "member_definition" => out.extend(extract_member(child, src)),
+            "command_statement" => out.extend(extract_gadget(child, src, None)),
+            "frame_block" => {
+                let kind = child
+                    .child_by_field_name("kind")
+                    .map(|k| node_text(k, src))
+                    .unwrap_or_else(|| "frame".to_string());
+                out.extend(extract_gadget(child, src, Some(&kind)));
+                collect_gadgets(child, src, out);
             }
             _ => {}
         }
     }
-    String::new()
+}
+
+/// A gadget line is `<gadget-kind> .name ...`. `kind_override` is used for
+/// frame blocks, whose kind is a keyword rather than a command name.
+fn extract_gadget(node: Node, src: &[u8], kind_override: Option<&str>) -> Option<Symbol> {
+    let kind = match kind_override {
+        Some(k) => k.to_ascii_lowercase(),
+        None => node_text(node.child_by_field_name("name")?, src).to_ascii_lowercase(),
+    };
+    if !GADGET_KINDS.contains(&kind.as_str()) {
+        return None;
+    }
+    // The first `.name` word after the gadget kind is the gadget name.
+    let mut cursor = node.walk();
+    let found = node.named_children(&mut cursor).find(|c| {
+        c.kind() == "command_word"
+            && c.utf8_text(src).map(|t| t.starts_with('.')).unwrap_or(false)
+    });
+    let name_node = found?;
+    let name = node_text(name_node, src);
+    let detail = format!("{} {} is {}", kind, name, kind.to_ascii_uppercase());
+    Some(Symbol {
+        documentation: format!(
+            "**Form gadget.**\n\n```pml\n{}\n```",
+            node_text(node, src).lines().next().unwrap_or("").trim()
+        ),
+        name,
+        kind: SymbolKind::Gadget,
+        detail,
+        range: node_range(node),
+        selection_range: node_range(name_node),
+        children: Vec::new(),
+        owner: None,
+    })
+}
+
+/// `!!name = ...` or `var !!name ...` at any level.
+fn extract_global(node: Node, src: &[u8], field: &str) -> Option<Symbol> {
+    let var_node = node.child_by_field_name(field)?;
+    if var_node.kind() != "variable" {
+        return None;
+    }
+    let name = node_text(var_node, src);
+    if !name.starts_with("!!") {
+        return None;
+    }
+    let detail = format!("{} (global variable)", name);
+    Some(Symbol {
+        documentation: format!(
+            "**Global variable** assigned in this file.\n\n```pml\n{}\n```",
+            node_text(node, src).trim()
+        ),
+        name,
+        kind: SymbolKind::Variable,
+        detail,
+        range: node_range(node),
+        selection_range: node_range(var_node),
+        children: Vec::new(),
+        owner: None,
+    })
+}
+
+/// `!a is REAL, !b is STRING`
+fn format_params(def_node: Node, src: &[u8]) -> String {
+    let Some(plist) = child_by_kind(def_node, "parameter_list") else {
+        return String::new();
+    };
+    children_by_kind(plist, "parameter")
+        .into_iter()
+        .map(|p| {
+            let pname = p
+                .child_by_field_name("name")
+                .map(|n| node_text(n, src))
+                .unwrap_or_else(|| "?".to_string());
+            let ptype = p
+                .child_by_field_name("type")
+                .map(|n| node_text(n, src))
+                .unwrap_or_else(|| "ANY".to_string());
+            format!("{} is {}", pname, ptype)
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// ` is RETURNTYPE` or empty. The return type is the `type_identifier` that is
+/// a direct child of the definition (parameter types sit inside `parameter`).
+fn format_return_type(def_node: Node, src: &[u8]) -> String {
+    child_by_kind(def_node, "type_identifier")
+        .map(|t| format!(" is {}", node_text(t, src)))
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -331,36 +510,85 @@ mod tests {
     }
 
     #[test]
-    fn extracts_function_definition() {
+    fn extracts_function_definition_with_signature() {
         let table = extract_from(
-            "define function !!Area(!Length is REAL, !Width is REAL) is REAL\n\
-            !Area = !Length * !Width\n\
-            return !Area\n\
-            endfunction\n",
+            "-- Computes an area\n\
+             define function !!Area(!Length is REAL, !Width is REAL) is REAL\n\
+             !Area = !Length * !Width\n\
+             return !Area\n\
+             endfunction\n",
         );
-        let func = table.symbols.iter().find(|s| s.name == "!!Area")
-            .expect("function not extracted");
-        assert!(matches!(func.kind, SymbolKind::Function));
-        assert!(func.detail.contains("REAL"));
+        let func = table.find("!!Area").expect("function not extracted");
+        assert_eq!(func.kind, SymbolKind::Function);
+        assert_eq!(
+            func.detail,
+            "define function !!Area(!Length is REAL, !Width is REAL) is REAL"
+        );
+        assert!(func.documentation.starts_with("Computes an area"));
+        assert_eq!(func.selection_range.start.line, 1);
     }
 
     #[test]
     fn skips_local_assignments_inside_function() {
-        let table = extract_from(
-            "define function !!Foo() is REAL\n\
-            !x = 1\n\
-            return !x\n\
-            endfunction\n",
-        );
-        // !x is a local — should NOT appear
-        assert!(!table.symbols.iter().any(|s| s.name == "!x"));
+        let table =
+            extract_from("define function !!Foo() is REAL\n!x = 1\nreturn !x\nendfunction\n");
+        assert!(table.find("!x").is_none());
     }
 
     #[test]
-    fn extracts_global_assignment() {
-        let table = extract_from("!!myGlobal = 'hello'\n");
-        let g = table.symbols.iter().find(|s| s.name == "!!myGlobal")
-            .expect("global not extracted");
-        assert!(matches!(g.kind, SymbolKind::Variable));
+    fn extracts_global_assignment_and_var() {
+        let table = extract_from("!!myGlobal = 'hello'\nvar !!coll coll all equi\n!local = 1\n");
+        assert_eq!(table.find("!!myGlobal").unwrap().kind, SymbolKind::Variable);
+        assert_eq!(table.find("!!coll").unwrap().kind, SymbolKind::Variable);
+        assert!(table.find("!local").is_none());
+        assert!(table.find("!myGlobal").is_none(), "!x must not match !!x");
+        assert!(table.find("$!!myGlobal").is_some(), "$ dereference prefix is ignored");
+    }
+
+    #[test]
+    fn extracts_method_and_object_members() {
+        let table = extract_from(
+            "define object BOX\n  member .width is REAL\n  member .height is REAL\nendobject\n\n\
+             define method .area() is REAL\n  return !this.width * !this.height\nendmethod\n",
+        );
+        let obj = table.find("BOX").unwrap();
+        assert_eq!(obj.kind, SymbolKind::Object);
+        assert_eq!(obj.children.len(), 2);
+        assert_eq!(obj.children[0].name, ".width");
+        assert_eq!(obj.children[0].detail, "member .width is REAL");
+        assert_eq!(obj.children[0].type_name().as_deref(), Some("REAL"));
+        let m = table.find(".area").unwrap();
+        assert_eq!(m.kind, SymbolKind::Method);
+        assert!(table.find("area").is_none(), "bare word must not match a method");
+        assert!(table.find("!!area").is_none(), "a global must not match a method");
+        assert_eq!(m.detail, "define method .area() is REAL");
+        assert_eq!(m.owner.as_deref(), Some("BOX"));
+        assert!(m.owned_by("box"));
+        assert_eq!(obj.children[0].owner.as_deref(), Some("BOX"));
+        assert_eq!(table.owner().unwrap().name, "BOX");
+        assert_eq!(table.find(".height").unwrap().kind, SymbolKind::Member);
+    }
+
+    #[test]
+    fn extracts_form_gadgets_including_nested_frames() {
+        let table = extract_from(
+            "setup form !!myForm dialog dock left\n\
+               title |My Form|\n\
+               member .count is REAL\n\
+               frame .fr |Frame|\n\
+                 button .ok |OK| call |!this.okPressed()|\n\
+               exit\n\
+               text .input |Name| width 20 is STRING\n\
+             exit\n",
+        );
+        let form = table.find("!!myForm").unwrap();
+        assert_eq!(form.kind, SymbolKind::Form);
+        assert_eq!(form.type_name().as_deref(), Some("FORM"));
+        let names: Vec<&str> = form.children.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec![".count", ".fr", ".ok", ".input"]);
+        assert_eq!(form.children[2].detail, "button .ok is BUTTON");
+        assert_eq!(form.children[2].type_name().as_deref(), Some("BUTTON"));
+        assert_eq!(form.children[1].kind, SymbolKind::Gadget);
+        assert!(form.children[2].owned_by("!!myForm"));
     }
 }

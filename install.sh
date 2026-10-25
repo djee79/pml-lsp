@@ -1,26 +1,43 @@
 #!/usr/bin/env bash
+# Build pml-lsp and (optionally) install the tree-sitter-pml grammar for Neovim.
+#
+#   ./install.sh                 build the LSP only
+#   ./install.sh --grammar DIR   also build DIR/pml.so and link parser + queries
+#                                into Neovim (DIR is a tree-sitter-pml checkout)
 set -euo pipefail
 
 NVIM_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
 NVIM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Building LSP..."
-cargo build --release
+echo "Building pml-lsp (release)..."
+cargo build --release --manifest-path "$HERE/Cargo.toml"
+BIN="$HERE/target/release/pml-lsp"
+echo "Binary: $BIN"
 
-echo "Setting up grammar..."
-GRAMMAR_DIR="$NVIM_CONFIG/lua/user/tree-sitter-pml"
-if [ ! -d "$GRAMMAR_DIR" ]; then
-  git clone https://github.com/djee79/tree-sitter-pml.git "$GRAMMAR_DIR"
+if [ "${1:-}" = "--grammar" ]; then
+  GRAMMAR_DIR="${2:?usage: install.sh --grammar /path/to/tree-sitter-pml}"
+  echo "Building grammar in $GRAMMAR_DIR..."
+  (cd "$GRAMMAR_DIR" && tree-sitter build -o pml.so)
+
+  mkdir -p "$NVIM_DATA/site/parser" "$NVIM_CONFIG/queries/pml"
+  ln -sfn "$GRAMMAR_DIR/pml.so" "$NVIM_DATA/site/parser/pml.so"
+  for q in highlights locals folds injections; do
+    ln -sfn "$GRAMMAR_DIR/queries/$q.scm" "$NVIM_CONFIG/queries/pml/$q.scm"
+  done
+  echo "Linked parser and queries into Neovim."
 fi
-cd "$GRAMMAR_DIR"
-npx tree-sitter generate
-npx tree-sitter build -o pml.so
 
-mkdir -p "$NVIM_DATA/site/parser"
-ln -sf "$GRAMMAR_DIR/pml.so" "$NVIM_DATA/site/parser/pml.so"
+cat <<EOF
 
-mkdir -p "$NVIM_CONFIG/queries"
-ln -sf "$GRAMMAR_DIR/queries/pml" "$NVIM_CONFIG/queries/pml"
+Neovim (LazyVim) config, e.g. lua/plugins/pml-lsp.lua:
 
-echo "Done. Binary at: $(pwd)/target/release/pml-lsp"
-echo "Update your LazyVim pml-lsp.lua plugin spec to point at that path."
+  return {
+    { "neovim/nvim-lspconfig",
+      opts = { servers = { pml_ls = {
+        cmd = { "$BIN" },
+        filetypes = { "pml" },
+        root_markers = { ".git" },
+      } } } },
+  }
+EOF

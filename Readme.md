@@ -1,74 +1,132 @@
-# pml-lsp — PML Language Server
+# pml-lsp
 
-A Language Server Protocol implementation for AVEVA PML, providing
-IntelliSense-style completion and hover for PML built-ins.
+A language server for AVEVA PML, built on the
+[tree-sitter-pml](https://github.com/djee79/tree-sitter-pml) grammar.
+
+## Features
+
+- **Workspace index**: every PML file under the project root (or the open
+  file's folder when there is no project) is parsed at startup and kept fresh
+  through file watchers. Symbols resolve across files: a method defined in
+  `box.pmlobj` completes and jumps from `main.pmlfrm`.
+- **Diagnostics**: syntax errors from the parse tree, confined to the line
+  they occur on.
+- **Completion**, aware of what you are typing:
+  - after `.`: the receiver is resolved when possible and only its members
+    are offered: `!this.` gives the current object's or form's methods,
+    members and gadgets; `!b.` after `!b = object BOX()` or a `!b is BOX`
+    parameter gives BOX's methods from any file; `!!myForm.input.` gives
+    TEXT gadget methods; `!s.` after `!s = 'x'` gives STRING methods.
+    Types flow through chains and return types: after
+    `!s = !this.name.val.upcase()`, `!s.` knows it is a STRING (`.val` of a
+    TEXT gadget is taken as STRING, TOGGLE as BOOLEAN, OPTION/LIST as REAL). Hovering a
+    variable shows its inferred type. When the type is unknown, everything
+    that fits after a dot is offered;
+  - after `!` / `!!`: every variable used in the file, plus user functions,
+    forms and globals;
+  - otherwise: keywords, snippets, constructors, PML functions and user
+    objects/functions/forms.
+- **Hover** on builtins and user symbols, showing the signature and the
+  leading `--` comment block as documentation.
+- **Go to definition** for functions, methods, objects, members, forms,
+  gadgets and globals, in the current file or any indexed file.
+- **Signature help** while typing call arguments, for user functions and
+  methods, object constructors and builtins. Follows `$` continuations.
+- **Semantic tokens**: `!!name` is coloured as a function, form or global
+  according to what defines it; `.name` as a user method, builtin method,
+  gadget or member; type names as user objects or builtin types. Layered on
+  top of tree-sitter highlighting through Neovim's `@lsp.type.*` groups.
+- **Find references** and **rename** across all indexed files. Matching is
+  case-insensitive and namespace-aware: renaming `.scale` touches methods and
+  calls, not a `!scale` variable. Local `!x` variables are renamed inside
+  their function or method only.
+- **Document symbols** (outline): objects with their members, forms with
+  their gadgets, functions, methods, globals. **Workspace symbols**
+  (`<leader>sS`) search every indexed file.
+
+Builtins come from `data/builtins.json`, which is embedded in the binary at
+build time. Set `$PML_LSP_BUILTINS` to a JSON file to override it at runtime
+without rebuilding.
+
+## Building
+
+```sh
+cargo build --release          # binary: target/release/pml-lsp
+cargo test
+```
+
+The grammar is fetched from GitHub. To build against a local checkout of
+`tree-sitter-pml`, uncomment the `[patch]` section in `Cargo.toml`.
+
+`./install.sh --grammar ../tree-sitter-pml` builds both the server and the
+parser shared library and links the parser and queries into Neovim.
+
+## Neovim (LazyVim)
+
+```lua
+-- lua/plugins/pml-lsp.lua
+return {
+  {
+    "neovim/nvim-lspconfig",
+    opts = {
+      servers = {
+        pml_ls = {
+          cmd = { vim.fn.expand("~/dev/pml-lsp/target/release/pml-lsp") },
+          filetypes = { "pml" },
+          root_markers = { ".git" },
+        },
+      },
+    },
+  },
+}
+```
+
+The `pml` filetype and the tree-sitter parser are set up by the grammar repo;
+see its README.
+
+Useful commands: `gd` go to definition, `gr` references, `<leader>cr`
+rename, `K` hover, `<C-k>` signature help in insert mode, `<leader>ss`
+document symbols, `<leader>sS` workspace symbols, `:LspInfo`, `:LspLog`.
+
+The project root is the folder containing `.git`. Without one, the server
+indexes the folder of each file you open.
 
 ## Project layout
 
 ```
-pml-lsp/
-├── Cargo.toml
-├── src/
-│   └── main.rs            # LSP server (loads builtins.json at startup)
-└── data/
-    └── builtins.json      # Built-in symbol definitions
+src/main.rs          LSP server: capabilities, completion, hover, definition, symbols
+src/parser.rs        tree-sitter parser wrapper
+src/symbols.rs       symbol extraction from the parse tree
+src/diagnostics.rs   ERROR / MISSING nodes -> diagnostics
+src/context.rs       cursor context (after `.`, after `!`, statement), word lookup, variable type inference
+src/workspace.rs     project-wide file discovery and indexing
+src/signature.rs     call-site detection and signature parsing
+src/references.rs    namespace-aware occurrences for references and rename
+src/types.rs         static type inference over expression chains
+src/semantic.rs      semantic tokens
+data/builtins.json   builtin methods, functions, keywords, snippets
 ```
 
-## Building and using
+## Adding a builtin
 
-```bash
-cargo build --release
-```
+Each entry in `data/builtins.json`:
 
-The binary lands at `target/release/pml-lsp`. Point your editor's LSP
-config at it. Restart the server after rebuilding or after editing
-`data/builtins.json`.
+| Field            | Required | Notes |
+| ---------------- | -------- | ----- |
+| `name`           | yes      | Completion label; matched case-insensitively on hover |
+| `kind`           | yes      | `Method`, `Function`, `Constructor`, `Variable`, `Keyword`, `Snippet`, `Field`, `Class`, `Constant`, `Operator` |
+| `detail`         | yes      | One-line signature, e.g. `Length() IS REAL` |
+| `documentation`  | yes      | Markdown for the side panel and hover |
+| `insert_text`    | no       | LSP snippet body |
+| `receiver_types` | no       | Object types a method belongs to, e.g. `["STRING"]`. Methods are only offered after `.`, and filtered by this when the receiver type is known |
 
-The server looks for `builtins.json` in this order:
-1. `$PML_LSP_BUILTINS` environment variable (explicit override)
-2. Relative to the binary at `../data/builtins.json` or `../../data/builtins.json`
-3. `./data/builtins.json` (when run from the project root)
+Conventions: consolidate overloads into one entry and list them in the
+documentation; keep `detail` to one line; paraphrase the manual.
 
-If you move the binary elsewhere, set `$PML_LSP_BUILTINS` to its absolute path.
+Rebuild after editing the JSON (it is embedded), or point
+`$PML_LSP_BUILTINS` at the file for live edits.
 
-## Adding a new built-in
+## Roadmap
 
-Each entry in `data/builtins.json` is an object with these fields:
-
-| Field            | Required | Notes                                                              |
-| ---------------- | -------- | ------------------------------------------------------------------ |
-| `name`           | yes      | What appears in the completion menu and matches against typed text |
-| `kind`           | yes      | `"Method"`, `"Function"`, `"Constructor"`, `"Variable"`, `"Keyword"`, `"Snippet"`, `"Field"`, `"Class"`, `"Constant"`, `"Operator"` |
-| `detail`         | yes      | Short signature shown in the menu (e.g., `"Length() IS REAL"`)     |
-| `documentation`  | yes      | Markdown shown in the side panel and on hover                      |
-| `insert_text`    | no       | LSP snippet body (e.g., `"DO !${1:i} FROM 1 TO ${2:10}\n    $0\nENDDO"`) |
-| `receiver_types` | no       | Array of object types this method belongs to, e.g. `["STRING"]`. Reserved for context-aware filtering in a future stage. |
-
-### Conventions
-
-- **Consolidate overloads.** When the manual lists `Replace(STRING, STRING)`,
-  `Replace(STRING, STRING, REAL)`, and `Replace(STRING, STRING, REAL, REAL)`,
-  create *one* entry called `Replace` and list all overloads in the
-  `documentation` markdown. Otherwise the menu shows three identical-looking
-  items.
-- **Paraphrase the manual.** Don't copy descriptions verbatim — write them
-  in your own words. The result is usually clearer than the original.
-- **Detail field is signature-only.** Keep it short — one line if possible.
-  Use `[ ]` for optional arguments: `Trim([STRING options[, STRING char]]) IS STRING`.
-
-## Workflow for a new object section
-
-1. Pick an object from the AVEVA reference manual (e.g., `REAL`, `ARRAY`, `DBREF`).
-2. Read its methods table from the PDF.
-3. Append entries to `data/builtins.json` following the conventions above.
-4. Validate the JSON: `python3 -c "import json; json.load(open('data/builtins.json'))"`
-5. Restart your editor's LSP. No rebuild required for JSON-only changes.
-
-## Stages
-
-- **Stage 1 (current):** Static built-ins from JSON. Completion + hover work.
-- **Stage 2:** Tree-sitter integration to extract user-defined functions,
-  methods, objects, and variables from the open document. Adds context
-  awareness.
-- **Stage 3:** Cross-file resolution by walking project directories at startup.
-- **Stage 4:** Signature help, diagnostics, go-to-definition.
+- Code actions: create a missing method stub, add a `handle` block.
+- Formatting: consistent indentation of blocks.
