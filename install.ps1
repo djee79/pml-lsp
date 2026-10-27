@@ -47,11 +47,21 @@ if ($Grammar) {
   Write-Host "Building grammar in $GrammarDir..."
   Push-Location $GrammarDir
   try {
+    # Stale outputs would hide a failed build.
+    Remove-Item -Force -ErrorAction SilentlyContinue pml.dll, pml.so
     tree-sitter build -o pml.dll
     if ($LASTEXITCODE -ne 0) { throw "tree-sitter build failed" }
   } finally {
     Pop-Location
   }
+
+  # Some tree-sitter CLI versions ignore the -o extension and emit pml.so even
+  # on Windows. Take whichever came out; it is a Windows DLL either way.
+  $Built = @("pml.dll", "pml.so") |
+    ForEach-Object { Join-Path $GrammarDir $_ } |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
+  if (-not $Built) { throw "tree-sitter build produced neither pml.dll nor pml.so in $GrammarDir" }
 
   $NvimData = Join-Path $env:LOCALAPPDATA "nvim-data"
   $NvimConfig = Join-Path $env:LOCALAPPDATA "nvim"
@@ -59,7 +69,7 @@ if ($Grammar) {
   $QueryDir = Join-Path $NvimConfig "queries\pml"
   New-Item -ItemType Directory -Force -Path $ParserDir, $QueryDir | Out-Null
 
-  Copy-Item -Force (Join-Path $GrammarDir "pml.dll") (Join-Path $ParserDir "pml.dll")
+  Copy-Item -Force $Built (Join-Path $ParserDir "pml.dll")
   foreach ($q in "highlights", "locals", "folds", "injections") {
     Copy-Item -Force (Join-Path $GrammarDir "queries\$q.scm") (Join-Path $QueryDir "$q.scm")
   }
